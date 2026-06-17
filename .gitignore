@@ -1,0 +1,18 @@
+# Rust
+/target
+
+# данные локального сервера
+/data
+
+# Android / Gradle
+android/.gradle/
+android/build/
+android/**/build/
+android/local.properties
+android/app/src/main/jniLibs/
+# сгенерированные UniFFI-биндинги
+android/app/src/main/kotlin/uniffi/
+
+# IDE / OS
+.idea/
+.DS_Store
