@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/proto"]
+members = ["crates/proto", "crates/core"]
 
 [workspace.package]
 version = "0.1.0"
@@ -10,6 +10,7 @@ publish = false
 [workspace.dependencies]
 # внутренние крейты
 fortochka-proto = { path = "crates/proto" }
+fortochka-core = { path = "crates/core" }
 
 # общие
 serde = { version = "1", features = ["derive"] }
@@ -18,6 +19,13 @@ thiserror = "2"
 anyhow = "1"
 url = "2"
 tracing = "0.1"
+
+# клиент (core)
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+
+# тесты
+tempfile = "3"
+httpmock = "0.7"
 
 [workspace.lints.rust]
 unsafe_code = "warn"
