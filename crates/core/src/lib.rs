@@ -4,9 +4,13 @@
 //! его вызывают из фонового потока (WorkManager / GCD), и тащить туда
 //! async-рантайм незачем. Асинхронность живёт только на сервере.
 
+pub mod client;
+pub mod config;
 pub mod error;
 pub mod retry;
 
+pub use client::ApiClient;
+pub use config::{DeviceConfig, DeviceRole};
 pub use error::CoreError;
 
 /// Версия ядра — её дергаем из Kotlin/Swift для проверки FFI-моста.
