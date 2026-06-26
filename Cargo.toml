@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/proto", "crates/core"]
+members = ["crates/proto", "crates/core", "crates/server"]
 
 [workspace.package]
 version = "0.1.0"
@@ -22,6 +22,16 @@ tracing = "0.1"
 
 # клиент (core)
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+
+# сервер
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "signal"] }
+axum = "0.8"
+tower-http = { version = "0.6", features = ["trace"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "migrate"] }
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+uuid = { version = "1", features = ["v4"] }
+rand = "0.9"
 
 # тесты
 tempfile = "3"
