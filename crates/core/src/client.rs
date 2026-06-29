@@ -125,15 +125,15 @@ impl ApiClient {
         if status.is_success() {
             return Ok(resp);
         }
-        let message = resp
-            .json::<ApiErrorBody>()
-            .map(|body| body.message)
-            .unwrap_or_else(|_| {
+        let message = resp.json::<ApiErrorBody>().map_or_else(
+            |_| {
                 status
                     .canonical_reason()
                     .unwrap_or("неизвестная ошибка")
                     .to_owned()
-            });
+            },
+            |body| body.message,
+        );
         Err(CoreError::Api {
             status: status.as_u16(),
             message,

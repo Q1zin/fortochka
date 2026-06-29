@@ -62,7 +62,7 @@ pub struct FrameUploadResponse {
 /// Тело ошибки, которое сервер отдаёт вместе с не-2xx статусом.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiErrorBody {
-    /// Машиночитаемый код («invalid_pairing_code», «camera_not_found»).
+    /// Машиночитаемый код (`invalid_pairing_code`, `camera_not_found`).
     pub code: String,
     /// Человекочитаемое описание для логов и UI.
     pub message: String,

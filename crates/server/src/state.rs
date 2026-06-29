@@ -18,8 +18,7 @@ impl ServerConfig {
         Self {
             bind_addr: std::env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".into()),
             data_dir: std::env::var("DATA_DIR")
-                .map(PathBuf::from)
-                .unwrap_or_else(|_| PathBuf::from("./data")),
+                .map_or_else(|_| PathBuf::from("./data"), PathBuf::from),
         }
     }
 }
@@ -31,7 +30,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    /// Создаёт директорию данных, открывает SQLite (WAL — чтобы читатели
+    /// Создаёт директорию данных, открывает `SQLite` (`WAL` — чтобы читатели
     /// обоев не блокировались загрузкой кадров) и накатывает схему.
     pub async fn init(data_dir: &Path) -> anyhow::Result<Self> {
         tokio::fs::create_dir_all(data_dir)
