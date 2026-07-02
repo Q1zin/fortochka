@@ -1,6 +1,12 @@
 [workspace]
 resolver = "3"
-members = ["crates/proto", "crates/core", "crates/server"]
+members = [
+    "crates/proto",
+    "crates/core",
+    "crates/server",
+    "crates/mobile",
+    "crates/uniffi-bindgen",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -23,6 +29,9 @@ tracing = "0.1"
 # клиент (core)
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 
+# мобильная FFI-граница
+uniffi = "0.32"
+
 # сервер
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "signal"] }
 axum = "0.8"
@@ -43,7 +52,7 @@ unsafe_code = "warn"
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
-# pedantic полезен для обучения, но эти правила — шум для нашего стиля
+# pedantic полезен для обучения, но эти три правила — шум для нашего стиля
 module_name_repetitions = "allow"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"

@@ -1,0 +1,16 @@
+[package]
+name = "fortochka-mobile"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib", "lib"]
+
+[dependencies]
+fortochka-core = { workspace = true }
+thiserror = { workspace = true }
+uniffi = { workspace = true }
+
+[lints]
+workspace = true
