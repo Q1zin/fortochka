@@ -1,5 +1,10 @@
 # Команды разработки Форточки. Установка just: brew install just
 
+# NDK для cargo-ndk
+ndk_home := `echo "$NDK_HOME"`
+# Gradle 8.x требует JVM ≤ 23 — на маке закрепляемся на 21
+java_home := `/usr/libexec/java_home -v 21 2>/dev/null || echo "$JAVA_HOME"`
+
 default:
     @just --list
 
@@ -18,3 +23,25 @@ test:
 # Локальный запуск сервера (данные в ./data)
 server:
     cargo run -p fortochka-server
+
+# Разовая настройка Android-тулчейна (rustup-таргеты + cargo-ndk)
+setup-android:
+    rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+    cargo install cargo-ndk --locked
+
+# Kotlin-биндинги из Rust-ядра (uniffi)
+bindings:
+    bash scripts/gen-bindings.sh
+
+# Сборка Rust-ядра под Android + биндинги
+android-libs: bindings
+    ANDROID_NDK_HOME="{{ndk_home}}" cargo ndk -t arm64-v8a -t armeabi-v7a \
+        -o android/app/src/main/jniLibs build -p fortochka-mobile --release
+
+# Собрать APK и поставить на подключённый телефон
+android: android-libs
+    cd android && JAVA_HOME="{{java_home}}" ./gradlew installDebug
+
+# Только собрать APK (без установки)
+apk: android-libs
+    cd android && JAVA_HOME="{{java_home}}" ./gradlew assembleDebug
