@@ -1,0 +1,5 @@
+# Домен приходит из docker-compose (FORTOCHKA_DOMAIN в .env на сервере).
+# Caddy сам получает и продлевает сертификат Let's Encrypt.
+{$DOMAIN} {
+	reverse_proxy server:8080
+}

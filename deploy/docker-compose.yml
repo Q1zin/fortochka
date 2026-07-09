@@ -1,0 +1,28 @@
+# Прод-композиция: сервер + Caddy (авто-HTTPS).
+# Домен задаётся один раз на сервере в /opt/fortochka/.env:
+#   FORTOCHKA_DOMAIN=cam.example.com
+services:
+  server:
+    image: ghcr.io/q1zin/fortochka-server:latest
+    restart: unless-stopped
+    volumes:
+      # именованный том: владелец /data наследуется из образа (uid 10001)
+      - fortochka_data:/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${FORTOCHKA_DOMAIN:?задайте FORTOCHKA_DOMAIN в /opt/fortochka/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  fortochka_data:
+  caddy_data:
+  caddy_config:
