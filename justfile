@@ -1,7 +1,7 @@
 # Команды разработки Форточки. Установка just: brew install just
 
-# NDK для cargo-ndk
-ndk_home := `echo "$NDK_HOME"`
+# NDK: берём последнюю установленную версию из SDK
+ndk_home := `ls -d "$HOME/Library/Android/sdk/ndk"/* 2>/dev/null | sort -V | tail -1`
 # Gradle 8.x требует JVM ≤ 23 — на маке закрепляемся на 21
 java_home := `/usr/libexec/java_home -v 21 2>/dev/null || echo "$JAVA_HOME"`
 
