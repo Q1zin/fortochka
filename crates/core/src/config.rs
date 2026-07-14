@@ -15,7 +15,11 @@ pub enum DeviceRole {
 /// Состояние устройства. Платформа передаёт директорию для хранения
 /// (`filesDir` на Android, Application Support на iOS) — ядро не знает,
 /// где живут файлы конкретной ОС.
+///
+/// `serde(default)` — чтобы конфиг, записанный старой версией приложения,
+/// читался после добавления новых полей.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct DeviceConfig {
     pub server_url: Option<String>,
     pub role: Option<DeviceRole>,
@@ -23,6 +27,8 @@ pub struct DeviceConfig {
     pub camera_id: Option<String>,
     pub upload_token: Option<String>,
     pub pairing_code: Option<String>,
+    /// Интервал съёмки в секундах; `None` — платформенный дефолт (180).
+    pub capture_interval_secs: Option<u32>,
     // роль «зритель»
     pub view_token: Option<String>,
 }

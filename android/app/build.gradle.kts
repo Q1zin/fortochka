@@ -41,6 +41,10 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
+    // роль «камера»: CameraX + сервис с жизненным циклом
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.lifecycle.service)
     // JNA нужен сгенерированным UniFFI-биндингам (мост Kotlin → libfortochka_mobile.so)
     implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
 }

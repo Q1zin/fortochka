@@ -7,6 +7,8 @@
 // FFI-граница обязана принимать owned-типы — этого требует uniffi
 #![allow(clippy::needless_pass_by_value)]
 
+use std::path::Path;
+
 use fortochka_core::{ApiClient, CoreError};
 
 uniffi::setup_scaffolding!();
@@ -49,6 +51,73 @@ pub struct CameraRegistration {
 pub struct PairedCamera {
     pub view_token: String,
     pub camera_name: String,
+}
+
+#[derive(uniffi::Enum)]
+pub enum DeviceRole {
+    Camera,
+    Viewer,
+}
+
+/// Зеркало `fortochka_core::DeviceConfig` для FFI: uniffi-Record
+/// не может быть тем же типом, что и serde-структура ядра.
+#[derive(uniffi::Record)]
+pub struct DeviceConfig {
+    pub server_url: Option<String>,
+    pub role: Option<DeviceRole>,
+    pub camera_id: Option<String>,
+    pub upload_token: Option<String>,
+    pub pairing_code: Option<String>,
+    pub capture_interval_secs: Option<u32>,
+    pub view_token: Option<String>,
+}
+
+impl From<fortochka_core::DeviceConfig> for DeviceConfig {
+    fn from(c: fortochka_core::DeviceConfig) -> Self {
+        Self {
+            server_url: c.server_url,
+            role: c.role.map(|r| match r {
+                fortochka_core::DeviceRole::Camera => DeviceRole::Camera,
+                fortochka_core::DeviceRole::Viewer => DeviceRole::Viewer,
+            }),
+            camera_id: c.camera_id,
+            upload_token: c.upload_token,
+            pairing_code: c.pairing_code,
+            capture_interval_secs: c.capture_interval_secs,
+            view_token: c.view_token,
+        }
+    }
+}
+
+impl From<DeviceConfig> for fortochka_core::DeviceConfig {
+    fn from(c: DeviceConfig) -> Self {
+        Self {
+            server_url: c.server_url,
+            role: c.role.map(|r| match r {
+                DeviceRole::Camera => fortochka_core::DeviceRole::Camera,
+                DeviceRole::Viewer => fortochka_core::DeviceRole::Viewer,
+            }),
+            camera_id: c.camera_id,
+            upload_token: c.upload_token,
+            pairing_code: c.pairing_code,
+            capture_interval_secs: c.capture_interval_secs,
+            view_token: c.view_token,
+        }
+    }
+}
+
+/// Читает конфиг из `dir` (платформа передаёт свой files-каталог).
+/// Отсутствующий файл — не ошибка, вернётся пустой конфиг.
+#[uniffi::export]
+pub fn load_config(dir: String) -> Result<DeviceConfig, MobileError> {
+    Ok(fortochka_core::DeviceConfig::load(Path::new(&dir))?.into())
+}
+
+/// Атомарно сохраняет конфиг в `dir`.
+#[uniffi::export]
+pub fn save_config(dir: String, config: DeviceConfig) -> Result<(), MobileError> {
+    fortochka_core::DeviceConfig::from(config).save(Path::new(&dir))?;
+    Ok(())
 }
 
 /// Версия ядра — первый вызов из Kotlin для проверки моста Kotlin → JNI → Rust.
