@@ -45,7 +45,7 @@ private suspend fun <T> onIo(block: () -> T): T = withContext(Dispatchers.IO) { 
 @Composable
 fun FortochkaScreen() {
     val scope = rememberCoroutineScope()
-    var serverUrl by remember { mutableStateOf("https://") }
+    var serverUrl by remember { mutableStateOf("https://fortochka.fun") }
     var pairingCode by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("Rust-ядро на связи, версия ${coreVersion()}") }
 

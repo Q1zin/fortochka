@@ -24,6 +24,10 @@ test:
 server:
     cargo run -p fortochka-server
 
+# Сквозной smoke-тест: register → upload → pair → wallpaper (по умолчанию прод)
+smoke url="https://fortochka.fun":
+    bash scripts/smoke.sh {{url}}
+
 # Разовая настройка Android-тулчейна (rustup-таргеты + cargo-ndk)
 setup-android:
     rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android

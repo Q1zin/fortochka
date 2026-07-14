@@ -27,7 +27,7 @@ cat ~/.ssh/fortochka_deploy   # содержимое → секрет SSH_PRIVAT
 curl -fsSL https://get.docker.com | sh
 
 sudo mkdir -p /opt/fortochka && sudo chown $USER /opt/fortochka
-echo "FORTOCHKA_DOMAIN=<твой-домен>" > /opt/fortochka/.env
+echo "FORTOCHKA_DOMAIN=fortochka.fun" > /opt/fortochka/.env
 ```
 
 Если репозиторий (а значит и GHCR-пакет) приватный — серверу нужен доступ
@@ -36,28 +36,36 @@ echo "FORTOCHKA_DOMAIN=<твой-домен>" > /opt/fortochka/.env
 
 ## 3. DNS и порты
 
-- A-запись домена → IP сервера;
+- A-запись `fortochka.fun` → IP сервера;
 - открыты порты 80 и 443 (Caddy сам получит сертификат Let's Encrypt).
 
 ## 4. Проверка
 
-```bash
-curl https://<домен>/healthz          # → ok
+Сквозной smoke-тест (register → upload → pair → wallpaper):
 
-# полный цикл руками:
-curl -s -X POST https://<домен>/api/v1/cameras/register \
+```bash
+just smoke                              # против https://fortochka.fun
+just smoke http://127.0.0.1:8080        # против локального сервера
+```
+
+Либо руками:
+
+```bash
+curl https://fortochka.fun/healthz      # → ok
+
+curl -s -X POST https://fortochka.fun/api/v1/cameras/register \
   -H 'content-type: application/json' -d '{"name":"Тест"}'
 # → camera_id, upload_token, pairing_code
 
-curl -s -X POST https://<домен>/api/v1/cameras/<camera_id>/frame \
+curl -s -X POST https://fortochka.fun/api/v1/cameras/<camera_id>/frame \
   -H "authorization: Bearer <upload_token>" \
   -H 'content-type: image/jpeg' --data-binary @кадр.jpg
 
-curl -s -X POST https://<домен>/api/v1/pair \
+curl -s -X POST https://fortochka.fun/api/v1/pair \
   -H 'content-type: application/json' -d '{"pairing_code":"<код>"}'
 # → view_token
 
-curl -s "https://<домен>/cam/<view_token>/wallpaper.jpg?w=1080&h=2400" -o обои.jpg
+curl -s "https://fortochka.fun/cam/<view_token>/wallpaper.jpg?w=1080&h=2400" -o обои.jpg
 ```
 
 Откат на предыдущую версию: на сервере
