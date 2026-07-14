@@ -16,6 +16,16 @@ object ConfigStore {
     fun save(context: Context, config: DeviceConfig) =
         saveConfig(context.filesDir.absolutePath, config)
 
-    fun reset(context: Context) =
-        save(context, DeviceConfig(null, null, null, null, null, null, null))
+    fun reset(context: Context) = save(context, EMPTY)
+
+    val EMPTY = DeviceConfig(
+        serverUrl = null,
+        role = null,
+        cameraId = null,
+        uploadToken = null,
+        pairingCode = null,
+        captureIntervalSecs = null,
+        viewToken = null,
+        cameraName = null,
+    )
 }

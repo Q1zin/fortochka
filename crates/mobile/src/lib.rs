@@ -70,6 +70,7 @@ pub struct DeviceConfig {
     pub pairing_code: Option<String>,
     pub capture_interval_secs: Option<u32>,
     pub view_token: Option<String>,
+    pub camera_name: Option<String>,
 }
 
 impl From<fortochka_core::DeviceConfig> for DeviceConfig {
@@ -85,6 +86,7 @@ impl From<fortochka_core::DeviceConfig> for DeviceConfig {
             pairing_code: c.pairing_code,
             capture_interval_secs: c.capture_interval_secs,
             view_token: c.view_token,
+            camera_name: c.camera_name,
         }
     }
 }
@@ -102,6 +104,7 @@ impl From<DeviceConfig> for fortochka_core::DeviceConfig {
             pairing_code: c.pairing_code,
             capture_interval_secs: c.capture_interval_secs,
             view_token: c.view_token,
+            camera_name: c.camera_name,
         }
     }
 }

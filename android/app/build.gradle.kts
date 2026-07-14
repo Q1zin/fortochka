@@ -45,6 +45,8 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.lifecycle.service)
+    // роль «зритель»: периодическое обновление обоев
+    implementation(libs.androidx.work.runtime)
     // JNA нужен сгенерированным UniFFI-биндингам (мост Kotlin → libfortochka_mobile.so)
     implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
 }

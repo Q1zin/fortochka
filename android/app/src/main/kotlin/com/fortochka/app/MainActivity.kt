@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.LaunchedEffect
 import com.fortochka.app.camera.CameraService
 import com.fortochka.app.camera.CameraStatus
+import com.fortochka.app.viewer.ViewerStatus
+import com.fortochka.app.viewer.WallpaperWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -75,7 +77,8 @@ fun AppRoot() {
     }
     val reset: () -> Unit = {
         CameraService.stop(context)
-        saveAndSet(DeviceConfig(null, null, null, null, null, null, null))
+        WallpaperWorker.cancel(context)
+        saveAndSet(ConfigStore.EMPTY)
     }
 
     when (config?.role) {
@@ -107,6 +110,7 @@ fun SetupScreen(onDone: (DeviceConfig) -> Unit) {
                         pairingCode = reg.pairingCode,
                         captureIntervalSecs = null,
                         viewToken = null,
+                        cameraName = null,
                     ),
                 )
                 CameraService.start(context)
@@ -191,8 +195,12 @@ fun SetupScreen(onDone: (DeviceConfig) -> Unit) {
                             pairingCode = null,
                             captureIntervalSecs = null,
                             viewToken = cam.viewToken,
+                            cameraName = cam.cameraName,
                         ),
                     )
+                    // раз в 15 минут + первый кадр сразу
+                    WallpaperWorker.schedule(context)
+                    WallpaperWorker.refreshNow(context)
                     "Подключена камера «${cam.cameraName}» ✅"
                 } catch (e: Exception) {
                     "Ошибка: ${e.message}"
@@ -243,6 +251,11 @@ fun CameraScreen(config: DeviceConfig, onReset: () -> Unit) {
 
 @Composable
 fun ViewerScreen(config: DeviceConfig, onReset: () -> Unit) {
+    val context = LocalContext.current
+    val status by ViewerStatus.text.collectAsState()
+
+    LaunchedEffect(Unit) { ViewerStatus.restore(context) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -251,13 +264,14 @@ fun ViewerScreen(config: DeviceConfig, onReset: () -> Unit) {
     ) {
         Text("Форточка — зритель", style = MaterialTheme.typography.headlineMedium)
         Text(
-            "Камера подключена. Автообновление обоев появится в следующей версии (M3).",
+            "Окно в «${config.cameraName ?: "камеру"}»: обои обновляются раз в 15 минут.",
             style = MaterialTheme.typography.bodyMedium,
         )
-        Text(
-            "Токен: …${config.viewToken?.takeLast(6) ?: "—"}",
-            style = MaterialTheme.typography.bodySmall,
-        )
+        Text(status, style = MaterialTheme.typography.bodyLarge)
+
+        Button(onClick = { WallpaperWorker.refreshNow(context) }) {
+            Text("Обновить обои сейчас")
+        }
         OutlinedButton(onClick = onReset) { Text("Сбросить настройки") }
     }
 }

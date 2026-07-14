@@ -31,6 +31,8 @@ pub struct DeviceConfig {
     pub capture_interval_secs: Option<u32>,
     // роль «зритель»
     pub view_token: Option<String>,
+    /// Имя подключённой камеры — показываем зрителю в UI.
+    pub camera_name: Option<String>,
 }
 
 impl DeviceConfig {
