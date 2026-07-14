@@ -23,7 +23,7 @@ impl ApiClient {
             .map_err(|e| CoreError::InvalidBaseUrl(format!("{base_url}: {e}")))?;
         let http = Client::builder()
             .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(60))
+            .timeout(Duration::from_mins(1))
             .user_agent(concat!("fortochka-core/", env!("CARGO_PKG_VERSION")))
             .build()?;
         Ok(Self {
