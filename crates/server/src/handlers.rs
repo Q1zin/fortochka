@@ -34,7 +34,8 @@ pub async fn register_camera(
     Json(req): Json<RegisterCameraRequest>,
 ) -> Result<Json<RegisterCameraResponse>, ApiError> {
     let name = req.name.trim();
-    if name.is_empty() || name.len() > 100 {
+    // len() — байты UTF-8, а кириллическая буква занимает два
+    if name.is_empty() || name.chars().count() > 100 {
         return Err(ApiError::bad_request(
             "invalid_name",
             "имя камеры должно быть от 1 до 100 символов",

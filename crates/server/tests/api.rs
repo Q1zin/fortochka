@@ -104,6 +104,18 @@ fn pairing_code_is_case_insensitive() {
 }
 
 #[test]
+fn camera_name_limit_counts_characters_not_bytes() {
+    let server = spawn_server();
+    let api = client(&server);
+
+    // 100 кириллических букв — это 200 байт, но всего 100 символов
+    api.register_camera(&"Д".repeat(100))
+        .expect("100 символов — в пределах лимита");
+    let err = api.register_camera(&"Д".repeat(101)).unwrap_err();
+    assert!(matches!(err, CoreError::Api { status: 400, .. }), "{err:?}");
+}
+
+#[test]
 fn wrong_upload_token_is_unauthorized() {
     let server = spawn_server();
     let api = client(&server);
