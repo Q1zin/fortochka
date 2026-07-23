@@ -34,14 +34,13 @@ import kotlinx.coroutines.withContext
 import uniffi.fortochka_mobile.uploadFrame
 
 /**
- * Foreground-сервис роли «камера»: держит CameraX привязанным к своему
- * жизненному циклу и раз в интервал снимает кадр → отдаёт Rust-ядру
- * на загрузку. Партишн-wakelock позволяет работать при погашенном экране.
+ * Foreground-сервис роли «камера»: раз в интервал открывает камеру,
+ * снимает кадр и отдаёт его Rust-ядру на загрузку. Партишн-wakelock
+ * позволяет работать при погашенном экране.
  */
 class CameraService : LifecycleService() {
 
     private var wakeLock: PowerManager.WakeLock? = null
-    private var imageCapture: ImageCapture? = null
 
     /** Поворот «как у экрана» для текущего положения телефона. */
     private var rotation = Surface.ROTATION_0
@@ -62,7 +61,6 @@ class CameraService : LifecycleService() {
                     in 225..314 -> Surface.ROTATION_90
                     else -> Surface.ROTATION_0
                 }
-                imageCapture?.targetRotation = rotation
             }
         }
     }
@@ -112,8 +110,8 @@ class CameraService : LifecycleService() {
         }
         val intervalMs = (config.captureIntervalSecs ?: DEFAULT_INTERVAL_SECS).toLong() * 1000L
 
-        try {
-            bindCamera()
+        val provider = try {
+            cameraProvider()
         } catch (e: Exception) {
             CameraStatus.text.value = "не удалось открыть камеру: ${e.message}"
             stopSelf()
@@ -122,7 +120,7 @@ class CameraService : LifecycleService() {
 
         while (true) {
             try {
-                val jpeg = takeJpeg()
+                val jpeg = shoot(provider)
                 withContext(Dispatchers.IO) { uploadFrame(baseUrl, cameraId, token, jpeg) }
                 CameraStatus.text.value = "кадр отправлен в ${timeNow()} (${jpeg.size / 1024} КБ)"
             } catch (e: CancellationException) {
@@ -135,8 +133,8 @@ class CameraService : LifecycleService() {
         }
     }
 
-    private suspend fun bindCamera() {
-        val provider = suspendCancellableCoroutine<ProcessCameraProvider> { cont ->
+    private suspend fun cameraProvider(): ProcessCameraProvider =
+        suspendCancellableCoroutine { cont ->
             val future = ProcessCameraProvider.getInstance(this)
             future.addListener(
                 {
@@ -149,42 +147,51 @@ class CameraService : LifecycleService() {
                 ContextCompat.getMainExecutor(this),
             )
         }
+
+    /**
+     * Камера открыта только на время снимка: держать сенсор включённым
+     * ради кадра раз в несколько минут — нагрев, батарея и занятая камера
+     * для остальных (на Samsung — сенсор автояркости).
+     */
+    private suspend fun shoot(provider: ProcessCameraProvider): ByteArray {
         val capture = ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
             .setTargetRotation(rotation)
             .build()
         provider.unbindAll()
         provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, capture)
-        imageCapture = capture
+        try {
+            // только что открытой камере нужно время на экспозицию и баланс белого
+            delay(WARMUP_MS)
+            return takeJpeg(capture)
+        } finally {
+            provider.unbindAll()
+        }
     }
 
     /** Снимок в JPEG-байты: ImageCapture без выходного файла отдаёт готовый JPEG в plane 0. */
-    private suspend fun takeJpeg(): ByteArray = suspendCancellableCoroutine { cont ->
-        val capture = imageCapture
-        if (capture == null) {
-            cont.resumeWithException(IllegalStateException("камера не привязана"))
-            return@suspendCancellableCoroutine
-        }
-        capture.takePicture(
-            ContextCompat.getMainExecutor(this),
-            object : ImageCapture.OnImageCapturedCallback() {
-                override fun onCaptureSuccess(image: ImageProxy) {
-                    try {
-                        val buffer = image.planes[0].buffer
-                        val bytes = ByteArray(buffer.remaining())
-                        buffer.get(bytes)
-                        cont.resume(bytes)
-                    } finally {
-                        image.close()
+    private suspend fun takeJpeg(capture: ImageCapture): ByteArray =
+        suspendCancellableCoroutine { cont ->
+            capture.takePicture(
+                ContextCompat.getMainExecutor(this),
+                object : ImageCapture.OnImageCapturedCallback() {
+                    override fun onCaptureSuccess(image: ImageProxy) {
+                        try {
+                            val buffer = image.planes[0].buffer
+                            val bytes = ByteArray(buffer.remaining())
+                            buffer.get(bytes)
+                            cont.resume(bytes)
+                        } finally {
+                            image.close()
+                        }
                     }
-                }
 
-                override fun onError(exception: ImageCaptureException) {
-                    cont.resumeWithException(exception)
-                }
-            },
-        )
-    }
+                    override fun onError(exception: ImageCaptureException) {
+                        cont.resumeWithException(exception)
+                    }
+                },
+            )
+        }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT < 26) return
@@ -203,6 +210,7 @@ class CameraService : LifecycleService() {
     companion object {
         private const val CHANNEL_ID = "fortochka_camera"
         private const val NOTIFICATION_ID = 1
+        private const val WARMUP_MS = 2_000L
         const val DEFAULT_INTERVAL_SECS = 180u
 
         @Volatile
