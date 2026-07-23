@@ -48,7 +48,7 @@ crates/proto ──── DTO API (serde), общие для всех. Ноль 
 
 - `state.rs` — конфиг из env (`BIND_ADDR`, `DATA_DIR`), инициализация SQLite (WAL).
 - `handlers.rs` — регистрация, приём кадра, пейринг, выдача обоев.
-- `images.rs` — центр-кроп до соотношения экрана + resize, JPEG q85.
+- `images.rs` — поворот по EXIF, центр-кроп до соотношения экрана + resize, JPEG q85.
   Тяжёлая CPU-работа уводится в `spawn_blocking`.
 - `error.rs` — `ApiError` → HTTP-статус + JSON-тело `ApiErrorBody`;
   всё неожиданное → 500 без деталей (детали в логах).
