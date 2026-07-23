@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.PowerManager
+import android.view.OrientationEventListener
+import android.view.Surface
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -41,6 +43,30 @@ class CameraService : LifecycleService() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var imageCapture: ImageCapture? = null
 
+    /** Поворот «как у экрана» для текущего положения телефона. */
+    private var rotation = Surface.ROTATION_0
+
+    /**
+     * Экран у камеры не крутится (UI нет, автоповорот обычно выключен),
+     * а без подсказки CameraX пишет в EXIF поворот дисплея — и кадр
+     * с телефона, стоящего боком, ляжет набок. Положение берём
+     * с акселерометра; маппинг — как в документации CameraX.
+     */
+    private val orientationListener by lazy {
+        object : OrientationEventListener(this@CameraService) {
+            override fun onOrientationChanged(orientation: Int) {
+                if (orientation == ORIENTATION_UNKNOWN) return // лежит плашмя
+                rotation = when (orientation) {
+                    in 45..134 -> Surface.ROTATION_270
+                    in 135..224 -> Surface.ROTATION_180
+                    in 225..314 -> Surface.ROTATION_90
+                    else -> Surface.ROTATION_0
+                }
+                imageCapture?.targetRotation = rotation
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -61,12 +87,14 @@ class CameraService : LifecycleService() {
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "fortochka:camera")
             .apply { acquire() }
 
+        orientationListener.enable()
         running = true
         lifecycleScope.launch { captureLoop() }
     }
 
     override fun onDestroy() {
         running = false
+        orientationListener.disable()
         wakeLock?.release()
         CameraStatus.text.value = "камера остановлена"
         super.onDestroy()
@@ -123,6 +151,7 @@ class CameraService : LifecycleService() {
         }
         val capture = ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+            .setTargetRotation(rotation)
             .build()
         provider.unbindAll()
         provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, capture)
