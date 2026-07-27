@@ -157,6 +157,8 @@ class CameraService : LifecycleService() {
         val capture = ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
             .setTargetRotation(rotation)
+            // сервер всё равно пережимает кадр в q85 — больше слать незачем
+            .setJpegQuality(JPEG_QUALITY)
             .build()
         provider.unbindAll()
         provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, capture)
@@ -211,6 +213,7 @@ class CameraService : LifecycleService() {
         private const val CHANNEL_ID = "fortochka_camera"
         private const val NOTIFICATION_ID = 1
         private const val WARMUP_MS = 2_000L
+        private const val JPEG_QUALITY = 85
         const val DEFAULT_INTERVAL_SECS = 180u
 
         @Volatile
