@@ -30,10 +30,10 @@ impl From<CoreError> for MobileError {
     fn from(e: CoreError) -> Self {
         match e {
             CoreError::Api { status, message } => Self::Api { status, message },
-            // Сам reqwest пишет только общую фразу; причину — DNS,
-            // отказ соединения, TLS — несут вложенные source().
+            // Сам reqwest пишет общую фразу и URL (а в URL — токен зрителя);
+            // причину — DNS, отказ соединения, TLS — несут вложенные source().
             CoreError::Network(err) => Self::Network {
-                message: error_chain(&err),
+                message: error_chain(&err.without_url()),
             },
             other => Self::Other {
                 message: other.to_string(),
@@ -195,7 +195,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn network_error_shows_cause() {
+    fn network_error_shows_cause_without_url() {
         // Порт освобождается сразу после bind — соединение получит отказ.
         let port = std::net::TcpListener::bind("127.0.0.1:0")
             .unwrap()
@@ -214,5 +214,6 @@ mod tests {
 
         let message = MobileError::from(err).to_string();
         assert!(message.contains("tcp connect error"), "{message}");
+        assert!(!message.contains("secret-view-token"), "{message}");
     }
 }
