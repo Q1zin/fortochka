@@ -30,14 +30,24 @@ impl From<CoreError> for MobileError {
     fn from(e: CoreError) -> Self {
         match e {
             CoreError::Api { status, message } => Self::Api { status, message },
+            // Сам reqwest пишет только общую фразу; причину — DNS,
+            // отказ соединения, TLS — несут вложенные source().
             CoreError::Network(err) => Self::Network {
-                message: err.to_string(),
+                message: error_chain(&err),
             },
             other => Self::Other {
                 message: other.to_string(),
             },
         }
     }
+}
+
+/// «ошибка: её причина: причина причины» — вся цепочка `source()` в одну строку.
+fn error_chain(err: &dyn std::error::Error) -> String {
+    std::iter::successors(Some(err), |e| e.source())
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(": ")
 }
 
 #[derive(uniffi::Record)]
@@ -174,4 +184,35 @@ pub fn fetch_wallpaper(
     height: u32,
 ) -> Result<Vec<u8>, MobileError> {
     Ok(ApiClient::new(&base_url)?.fetch_wallpaper(&view_token, width, height)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use fortochka_core::retry::Backoff;
+
+    use super::*;
+
+    #[test]
+    fn network_error_shows_cause() {
+        // Порт освобождается сразу после bind — соединение получит отказ.
+        let port = std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        let err = ApiClient::new(&format!("http://127.0.0.1:{port}"))
+            .unwrap()
+            .with_backoff(Backoff {
+                attempts: 1,
+                base_delay: Duration::ZERO,
+                max_delay: Duration::ZERO,
+            })
+            .fetch_wallpaper("secret-view-token", 1, 1)
+            .unwrap_err();
+
+        let message = MobileError::from(err).to_string();
+        assert!(message.contains("tcp connect error"), "{message}");
+    }
 }
