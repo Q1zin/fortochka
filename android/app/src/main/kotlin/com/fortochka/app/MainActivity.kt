@@ -198,9 +198,8 @@ fun SetupScreen(onDone: (DeviceConfig) -> Unit) {
                             cameraName = cam.cameraName,
                         ),
                     )
-                    // раз в 15 минут + первый кадр сразу
+                    // периодическая задача: первый запуск сразу, дальше раз в 15 минут
                     WallpaperWorker.schedule(context)
-                    WallpaperWorker.refreshNow(context)
                     "Подключена камера «${cam.cameraName}» ✅"
                 } catch (e: Exception) {
                     "Ошибка: ${e.message}"
