@@ -2,9 +2,10 @@ package com.fortochka.app.viewer
 
 import android.app.WallpaperManager
 import android.content.Context
-import android.content.res.Resources
 import android.graphics.BitmapFactory
+import android.hardware.display.DisplayManager
 import android.os.Build
+import android.view.Display
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -40,12 +41,16 @@ class WallpaperWorker(context: Context, params: WorkerParameters) :
         }
 
         try {
-            val dm = Resources.getSystem().displayMetrics
+            // Весь экран в естественной ориентации: displayMetrics не включают
+            // системные панели (на Galaxy M21 — 1080×2131 вместо 1080×2340)
+            // и зависят от того, как повёрнут экран в момент запуска.
+            val mode = applicationContext.getSystemService(DisplayManager::class.java)
+                .getDisplay(Display.DEFAULT_DISPLAY).mode
             val jpeg = fetchWallpaper(
                 baseUrl,
                 viewToken,
-                dm.widthPixels.toUInt(),
-                dm.heightPixels.toUInt(),
+                mode.physicalWidth.toUInt(),
+                mode.physicalHeight.toUInt(),
             )
             val bitmap = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size)
                 ?: error("сервер вернул не картинку")
