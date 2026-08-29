@@ -69,27 +69,27 @@ fun AppRoot() {
     }
     if (!loaded) return
 
-    val saveAndSet: (DeviceConfig) -> Unit = { new ->
-        scope.launch {
-            onIo { ConfigStore.save(context, new) }
-            config = new
-        }
+    // Сервис камеры и воркер читают конфиг с диска, поэтому SetupScreen
+    // запускает их только после того, как save вернулся.
+    val save: suspend (DeviceConfig) -> Unit = { new ->
+        onIo { ConfigStore.save(context, new) }
+        config = new
     }
     val reset: () -> Unit = {
         CameraService.stop(context)
         WallpaperWorker.cancel(context)
-        saveAndSet(ConfigStore.EMPTY)
+        scope.launch { save(ConfigStore.EMPTY) }
     }
 
     when (config?.role) {
         DeviceRole.CAMERA -> CameraScreen(config!!, onReset = reset)
         DeviceRole.VIEWER -> ViewerScreen(config!!, onReset = reset)
-        else -> SetupScreen(onDone = saveAndSet)
+        else -> SetupScreen(onDone = save)
     }
 }
 
 @Composable
-fun SetupScreen(onDone: (DeviceConfig) -> Unit) {
+fun SetupScreen(onDone: suspend (DeviceConfig) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var serverUrl by remember { mutableStateOf("https://fortochka.fun") }
