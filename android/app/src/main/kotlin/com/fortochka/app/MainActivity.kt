@@ -124,7 +124,8 @@ fun SetupScreen(onDone: suspend (DeviceConfig) -> Unit) {
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { grants ->
-        if (grants.values.all { it }) {
+        // без уведомлений (Android 13+) сервис работает, без камеры — нет
+        if (grants[Manifest.permission.CAMERA] == true) {
             doRegisterCamera()
         } else {
             status = "Без разрешения на камеру роль «камера» невозможна"
