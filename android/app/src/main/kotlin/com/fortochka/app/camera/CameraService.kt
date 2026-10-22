@@ -74,12 +74,22 @@ class CameraService : LifecycleService() {
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setOngoing(true)
             .build()
-        ServiceCompat.startForeground(
-            this,
-            NOTIFICATION_ID,
-            notification,
-            if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA else 0,
-        )
+        try {
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                notification,
+                if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA else 0,
+            )
+        } catch (e: Exception) {
+            // Новые Android не дают поднять camera-сервис из фона (после ребута,
+            // перезапуска системой) — вместо падения по кругу ждём тапа человека.
+            CameraStatus.text.value = "камера на паузе: ${e.message}"
+            ResumeNotification.show(this)
+            stopSelf()
+            return
+        }
+        ResumeNotification.hide(this)
 
         wakeLock = (getSystemService(POWER_SERVICE) as PowerManager)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "fortochka:camera")
