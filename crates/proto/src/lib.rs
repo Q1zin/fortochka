@@ -12,6 +12,12 @@ pub mod routes {
     pub const REGISTER_CAMERA: &str = "/api/v1/cameras/register";
     pub const PAIR: &str = "/api/v1/pair";
 
+    /// Камера целиком: `DELETE` с upload-токеном убирает её с сервера.
+    #[must_use]
+    pub fn camera(camera_id: &str) -> String {
+        format!("/api/v1/cameras/{camera_id}")
+    }
+
     /// Приём кадра от камеры.
     #[must_use]
     pub fn camera_frame(camera_id: &str) -> String {

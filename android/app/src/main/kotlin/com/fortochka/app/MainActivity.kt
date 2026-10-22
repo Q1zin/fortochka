@@ -49,6 +49,7 @@ import uniffi.fortochka_mobile.DeviceConfig
 import uniffi.fortochka_mobile.DeviceRole
 import uniffi.fortochka_mobile.checkServer
 import uniffi.fortochka_mobile.coreVersion
+import uniffi.fortochka_mobile.deleteCamera
 import uniffi.fortochka_mobile.pairWithCode
 import uniffi.fortochka_mobile.registerCamera
 import uniffi.fortochka_mobile.viewStatus
@@ -86,7 +87,18 @@ fun AppRoot() {
         CameraService.stop(context)
         WallpaperWorker.cancel(context)
         ViewerStatus.clear(context)
-        scope.launch { save(ConfigStore.EMPTY) }
+        val old = config
+        scope.launch {
+            // Камеру убираем и с сервера, иначе её последний кадр висел бы там
+            // вечно. Нет сети — не беда: сброс на телефоне всё равно случится.
+            val url = old?.serverUrl
+            val id = old?.cameraId
+            val token = old?.uploadToken
+            if (old?.role == DeviceRole.CAMERA && url != null && id != null && token != null) {
+                onIo { runCatching { deleteCamera(url, id, token) } }
+            }
+            save(ConfigStore.EMPTY)
+        }
     }
 
     when (config?.role) {

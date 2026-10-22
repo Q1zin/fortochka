@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Сквозной smoke-тест сервера: healthz → register → upload → pair → wallpaper.
 # Использование: scripts/smoke.sh [base_url]   (по умолчанию — прод)
+# Смоук-камера в конце удаляется; SMOKE_KEEP=1 — оставить её для ручной проверки.
 set -euo pipefail
 BASE="${1:-https://fortochka.fun}"
 
@@ -54,6 +55,16 @@ echo "→ статус: последний кадр в $(jsonget "$STATUS" last_
 curl -fsS "$BASE/cam/$VIEW/wallpaper.jpg?w=108&h=240" -o "$TMP/wall.jpg"
 file "$TMP/wall.jpg" | grep -q JPEG || { echo "✗ обои — не JPEG"; exit 1; }
 echo "→ обои получены: $(file -b "$TMP/wall.jpg" | cut -d, -f1,8)"
+
+if [ "${SMOKE_KEEP:-}" != 1 ]; then
+    curl -fsS -X DELETE "$BASE/api/v1/cameras/$CAM" -H "authorization: Bearer $TOK"
+    GONE=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/cam/$VIEW/wallpaper.jpg")
+    [ "$GONE" = 404 ] || { echo "✗ после удаления обои всё ещё отдаются: $GONE"; exit 1; }
+    echo "→ смоук-камера удалена"
+    echo
+    echo "✅ Полный цикл прошёл на $BASE"
+    exit 0
+fi
 
 echo
 echo "✅ Полный цикл прошёл на $BASE"

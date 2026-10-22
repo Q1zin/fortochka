@@ -24,7 +24,7 @@ test:
 server:
     cargo run -p fortochka-server
 
-# Сквозной smoke-тест: register → upload → pair → wallpaper (по умолчанию прод)
+# Сквозной smoke-тест: register → upload → pair → wallpaper → delete (по умолчанию прод)
 smoke url="https://fortochka.fun":
     bash scripts/smoke.sh {{url}}
 

@@ -11,7 +11,7 @@ pub mod storage;
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use fortochka_proto::routes;
 use tower_http::trace::TraceLayer;
 
@@ -27,6 +27,10 @@ pub fn app(state: AppState) -> Router {
         .route(
             "/api/v1/cameras/{camera_id}/frame",
             post(handlers::upload_frame).layer(DefaultBodyLimit::max(MAX_FRAME_BYTES)),
+        )
+        .route(
+            "/api/v1/cameras/{camera_id}",
+            delete(handlers::delete_camera),
         )
         .route(routes::PAIR, post(handlers::pair))
         .route("/cam/{view_token}/wallpaper.jpg", get(handlers::wallpaper))

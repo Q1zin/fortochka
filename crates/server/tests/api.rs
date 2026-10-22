@@ -115,6 +115,37 @@ fn view_status_reports_last_frame_time() {
 }
 
 #[test]
+fn deleted_camera_disappears_for_viewers() {
+    let server = spawn_server();
+    let api = client(&server);
+    let camera = api.register_camera("Удаляемая").expect("register");
+    api.upload_frame(&camera.camera_id, &camera.upload_token, &test_jpeg(40, 80))
+        .expect("upload");
+    let paired = api.pair(&camera.pairing_code).expect("pair");
+
+    api.delete_camera(&camera.camera_id, &camera.upload_token)
+        .expect("delete");
+
+    let err = api.fetch_wallpaper(&paired.view_token, 10, 20).unwrap_err();
+    assert!(matches!(err, CoreError::Api { status: 404, .. }), "{err:?}");
+    let err = api.pair(&camera.pairing_code).unwrap_err();
+    assert!(matches!(err, CoreError::Api { status: 404, .. }), "{err:?}");
+}
+
+#[test]
+fn delete_requires_upload_token() {
+    let server = spawn_server();
+    let api = client(&server);
+    let camera = api.register_camera("Чужая").expect("register");
+
+    let err = api
+        .delete_camera(&camera.camera_id, "не-тот-токен")
+        .unwrap_err();
+    assert!(matches!(err, CoreError::Api { status: 401, .. }), "{err:?}");
+    api.pair(&camera.pairing_code).expect("камера на месте");
+}
+
+#[test]
 fn pairing_code_is_case_insensitive() {
     let server = spawn_server();
     let api = client(&server);

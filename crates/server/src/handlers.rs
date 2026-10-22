@@ -3,7 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
-use axum::http::{HeaderMap, header};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use fortochka_proto::{
     FrameUploadResponse, PairRequest, PairResponse, RegisterCameraRequest, RegisterCameraResponse,
@@ -86,21 +86,7 @@ pub async fn upload_frame(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<FrameUploadResponse>, ApiError> {
-    let token = bearer_token(&headers)?;
-
-    let row = sqlx::query("SELECT upload_token FROM cameras WHERE id = ?")
-        .bind(&camera_id)
-        .fetch_optional(&state.db)
-        .await?;
-    // Несуществующая камера и неверный токен неразличимы для клиента —
-    // не подсказываем перебором, какие id существуют.
-    let valid = row.is_some_and(|r| r.get::<String, _>("upload_token") == token);
-    if !valid {
-        return Err(ApiError::unauthorized(
-            "invalid_upload_token",
-            "неизвестная камера или неверный токен",
-        ));
-    }
+    authorize_camera(&state, &camera_id, &headers).await?;
 
     // Полный декод на каждый upload — лишний CPU; магических байт JPEG
     // достаточно, чтобы отсечь мусор. Декод случится при выдаче обоев.
@@ -120,6 +106,31 @@ pub async fn upload_frame(
         .await?;
     tracing::debug!(camera_id, bytes = body.len(), "принят кадр");
     Ok(Json(FrameUploadResponse { received_at }))
+}
+
+/// Камера уходит насовсем — вместе с кадром и зрителями. Это делает сброс
+/// настроек на телефоне-камере: иначе последний кадр висел бы на сервере вечно.
+pub async fn delete_camera(
+    State(state): State<AppState>,
+    Path(camera_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<StatusCode, ApiError> {
+    authorize_camera(&state, &camera_id, &headers).await?;
+
+    let mut tx = state.db.begin().await?;
+    sqlx::query("DELETE FROM view_tokens WHERE camera_id = ?")
+        .bind(&camera_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM cameras WHERE id = ?")
+        .bind(&camera_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    storage::delete_frame(&state.data_dir, &camera_id).await?;
+
+    tracing::info!(camera_id, "камера удалена");
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Зритель спрашивает, жива ли камера и есть ли новый кадр, —
@@ -238,6 +249,29 @@ pub async fn wallpaper(
         jpeg,
     )
         .into_response())
+}
+
+/// Запрос подписан upload-токеном именно этой камеры.
+async fn authorize_camera(
+    state: &AppState,
+    camera_id: &str,
+    headers: &HeaderMap,
+) -> Result<(), ApiError> {
+    let token = bearer_token(headers)?;
+    let row = sqlx::query("SELECT upload_token FROM cameras WHERE id = ?")
+        .bind(camera_id)
+        .fetch_optional(&state.db)
+        .await?;
+    // Несуществующая камера и неверный токен неразличимы для клиента —
+    // не подсказываем перебором, какие id существуют.
+    if row.is_some_and(|r| r.get::<String, _>("upload_token") == token) {
+        Ok(())
+    } else {
+        Err(ApiError::unauthorized(
+            "invalid_upload_token",
+            "неизвестная камера или неверный токен",
+        ))
+    }
 }
 
 fn bearer_token(headers: &HeaderMap) -> Result<&str, ApiError> {

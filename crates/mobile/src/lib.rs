@@ -182,6 +182,16 @@ pub fn upload_frame(
     Ok(())
 }
 
+/// Сброс телефона-камеры: камера, её кадр и зрители удаляются с сервера.
+#[uniffi::export]
+pub fn delete_camera(
+    base_url: String,
+    camera_id: String,
+    upload_token: String,
+) -> Result<(), MobileError> {
+    Ok(ApiClient::new(&base_url)?.delete_camera(&camera_id, &upload_token)?)
+}
+
 /// Жива ли камера и есть ли новый кадр — без скачивания самого кадра.
 #[uniffi::export]
 pub fn view_status(base_url: String, view_token: String) -> Result<ViewStatus, MobileError> {

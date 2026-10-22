@@ -22,6 +22,14 @@ pub async fn store_frame(data_dir: &Path, camera_id: &str, jpeg: &[u8]) -> std::
     Ok(())
 }
 
+/// Кадр удалённой камеры; если кадра не было — тоже не ошибка.
+pub async fn delete_frame(data_dir: &Path, camera_id: &str) -> std::io::Result<()> {
+    match fs::remove_file(frame_path(data_dir, camera_id)).await {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
+        _ => Ok(()),
+    }
+}
+
 /// `None` — камера ещё не прислала ни одного кадра.
 pub async fn load_frame(data_dir: &Path, camera_id: &str) -> std::io::Result<Option<Vec<u8>>> {
     match fs::read(frame_path(data_dir, camera_id)).await {

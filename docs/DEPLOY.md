@@ -47,7 +47,9 @@ echo "FORTOCHKA_DOMAIN=fortochka.fun" > /opt/fortochka/.env
 
 ## 4. Проверка
 
-Сквозной smoke-тест (register → upload → pair → wallpaper):
+Сквозной smoke-тест (register → upload → pair → status → wallpaper → delete).
+Свою камеру он в конце удаляет; `SMOKE_KEEP=1 just smoke` — оставить её
+и получить код для приложения:
 
 ```bash
 just smoke                              # против https://fortochka.fun

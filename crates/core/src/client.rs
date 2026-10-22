@@ -80,6 +80,19 @@ impl ApiClient {
         })
     }
 
+    /// Удалить камеру вместе с кадром и зрителями — сброс телефона-камеры.
+    pub fn delete_camera(&self, camera_id: &str, upload_token: &str) -> Result<(), CoreError> {
+        let url = self.url(&routes::camera(camera_id))?;
+        self.with_retry(|| {
+            let resp = self
+                .http
+                .delete(url.clone())
+                .bearer_auth(upload_token)
+                .send()?;
+            Self::expect_success(resp).map(drop)
+        })
+    }
+
     pub fn pair(&self, pairing_code: &str) -> Result<PairResponse, CoreError> {
         let url = self.url(routes::PAIR)?;
         let body = PairRequest {
