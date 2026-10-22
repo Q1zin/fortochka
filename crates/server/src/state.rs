@@ -31,7 +31,7 @@ pub struct AppState {
 
 impl AppState {
     /// Создаёт директорию данных, открывает `SQLite` (`WAL` — чтобы читатели
-    /// обоев не блокировались загрузкой кадров) и накатывает схему.
+    /// обоев не блокировались загрузкой кадров) и накатывает миграции.
     pub async fn init(data_dir: &Path) -> anyhow::Result<Self> {
         tokio::fs::create_dir_all(data_dir)
             .await
@@ -45,10 +45,11 @@ impl AppState {
             .await
             .context("не удалось открыть SQLite")?;
 
-        sqlx::raw_sql(include_str!("schema.sql"))
-            .execute(&db)
+        // migrate! вшивает migrations/ в бинарь — в Docker-образ папка не едет.
+        sqlx::migrate!()
+            .run(&db)
             .await
-            .context("не удалось применить схему БД")?;
+            .context("не удалось применить миграции БД")?;
 
         Ok(Self {
             db,
