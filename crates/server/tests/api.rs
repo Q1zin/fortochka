@@ -31,9 +31,9 @@ fn spawn_server() -> TestServer {
                 .await
                 .expect("bind");
             tx.send(listener.local_addr().expect("addr")).expect("send");
-            axum::serve(listener, fortochka_server::app(state))
-                .await
-                .expect("serve");
+            let app = fortochka_server::app(state)
+                .into_make_service_with_connect_info::<std::net::SocketAddr>();
+            axum::serve(listener, app).await.expect("serve");
         });
     });
 
@@ -143,6 +143,22 @@ fn delete_requires_upload_token() {
         .unwrap_err();
     assert!(matches!(err, CoreError::Api { status: 401, .. }), "{err:?}");
     api.pair(&camera.pairing_code).expect("камера на месте");
+}
+
+#[test]
+fn pairing_is_rate_limited() {
+    let server = spawn_server();
+    let api = client(&server);
+
+    // перебор кодов: после пачки попыток сервер начинает отвечать 429
+    let statuses: Vec<u16> = (0..15)
+        .map(|_| match api.pair("ZZZZZZ").unwrap_err() {
+            CoreError::Api { status, .. } => status,
+            other => panic!("ожидали Api, получили: {other:?}"),
+        })
+        .collect();
+    assert_eq!(statuses[0], 404, "{statuses:?}");
+    assert_eq!(statuses.last(), Some(&429), "{statuses:?}");
 }
 
 #[test]

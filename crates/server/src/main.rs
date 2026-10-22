@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use fortochka_server::{AppState, ServerConfig, app};
 use tracing_subscriber::EnvFilter;
 
@@ -15,9 +17,13 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(&config.bind_addr).await?;
     tracing::info!(addr = %config.bind_addr, data_dir = %config.data_dir.display(), "форточка-сервер слушает");
 
-    axum::serve(listener, app(state))
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    // адрес соединения — запасной ключ лимитера, если запрос пришёл не через Caddy
+    axum::serve(
+        listener,
+        app(state).into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
     Ok(())
 }
 

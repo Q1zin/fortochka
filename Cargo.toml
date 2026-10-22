@@ -33,9 +33,12 @@ reqwest = { version = "0.12", default-features = false, features = ["blocking", 
 uniffi = "0.32"
 
 # сервер
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "signal"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "signal", "time"] }
 axum = "0.8"
 tower-http = { version = "0.6", features = ["trace"] }
+# лимит запросов по IP: пейринг-код короткий, перебор надо тормозить
+tower_governor = { version = "0.8", default-features = false, features = ["axum"] }
+governor = "0.10"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
 image = { version = "0.25", default-features = false, features = ["jpeg"] }
