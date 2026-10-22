@@ -36,6 +36,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.core.content.IntentCompat
 import androidx.core.content.PackageManagerCompat
 import androidx.core.content.UnusedAppRestrictionsConstants
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.fortochka.app.camera.CameraService
 import com.fortochka.app.camera.CameraStatus
 import com.fortochka.app.viewer.ViewerStatus
@@ -273,22 +276,26 @@ fun CameraScreen(config: DeviceConfig, onReset: () -> Unit) {
 @Composable
 fun ViewerScreen(config: DeviceConfig, onReset: () -> Unit) {
     val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val status by ViewerStatus.text.collectAsState()
     var health by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) { ViewerStatus.restore(context) }
-    // жива ли камера — раз в минуту, пока экран открыт
+    // Жива ли камера — раз в минуту, пока экран на виду. Сам LaunchedEffect
+    // живёт и в свёрнутом приложении, поэтому цикл держим в repeatOnLifecycle.
     LaunchedEffect(Unit) {
         val baseUrl = config.serverUrl ?: return@LaunchedEffect
         val viewToken = config.viewToken ?: return@LaunchedEffect
-        while (true) {
-            health = try {
-                val camera = onIo { viewStatus(baseUrl, viewToken) }
-                describeCamera(camera.lastFrameAt, System.currentTimeMillis() / 1000)
-            } catch (e: Exception) {
-                "Не удалось узнать, что с камерой: ${e.message}"
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                health = try {
+                    val camera = onIo { viewStatus(baseUrl, viewToken) }
+                    describeCamera(camera.lastFrameAt, System.currentTimeMillis() / 1000)
+                } catch (e: Exception) {
+                    "Не удалось узнать, что с камерой: ${e.message}"
+                }
+                delay(60_000)
             }
-            delay(60_000)
         }
     }
 
