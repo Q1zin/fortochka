@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -32,6 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.LaunchedEffect
+import androidx.core.content.IntentCompat
+import androidx.core.content.PackageManagerCompat
+import androidx.core.content.UnusedAppRestrictionsConstants
 import com.fortochka.app.camera.CameraService
 import com.fortochka.app.camera.CameraStatus
 import com.fortochka.app.viewer.ViewerStatus
@@ -245,6 +249,7 @@ fun CameraScreen(config: DeviceConfig, onReset: () -> Unit) {
             )
         }) { Text("Разрешить работу в фоне") }
 
+        HibernationWarning()
         OutlinedButton(onClick = onReset) { Text("Сбросить настройки") }
     }
 }
@@ -272,6 +277,50 @@ fun ViewerScreen(config: DeviceConfig, onReset: () -> Unit) {
         Button(onClick = { WallpaperWorker.refreshNow(context) }) {
             Text("Обновить обои сейчас")
         }
+        HibernationWarning()
         OutlinedButton(onClick = onReset) { Text("Сбросить настройки") }
     }
 }
+
+/**
+ * Android «усыпляет» приложения, которые долго не открывали: отзывает
+ * разрешения и останавливает фоновую работу. Камеру и зрителя месяцами
+ * не открывают — просим исключить приложение. Пока исключение не включено,
+ * блок висит на экране.
+ */
+@Composable
+fun HibernationWarning() {
+    val context = LocalContext.current
+    var restricted by remember { mutableStateOf(false) }
+    var checks by remember { mutableIntStateOf(0) }
+    LaunchedEffect(checks) {
+        val status = onIo {
+            runCatching { PackageManagerCompat.getUnusedAppRestrictionsStatus(context).get() }
+                .getOrDefault(UnusedAppRestrictionsConstants.ERROR)
+        }
+        restricted = status in RESTRICTIONS_ON
+    }
+    // вернулись из настроек — проверяем заново
+    val settings = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { checks++ }
+    if (!restricted) return
+
+    Text(
+        "Android может «усыпить» Форточку, если её долго не открывать, — и всё остановится. " +
+            "В настройках выключите пункт для неиспользуемых приложений " +
+            "(«Удалять разрешения…» или «Приостанавливать работу…»).",
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    OutlinedButton(onClick = {
+        settings.launch(
+            IntentCompat.createManageUnusedAppRestrictionsIntent(context, context.packageName),
+        )
+    }) { Text("Не усыплять приложение") }
+}
+
+private val RESTRICTIONS_ON = setOf(
+    UnusedAppRestrictionsConstants.API_30_BACKPORT,
+    UnusedAppRestrictionsConstants.API_30,
+    UnusedAppRestrictionsConstants.API_31,
+)
