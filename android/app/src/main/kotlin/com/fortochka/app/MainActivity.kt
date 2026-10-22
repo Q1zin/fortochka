@@ -40,7 +40,9 @@ import com.fortochka.app.camera.CameraService
 import com.fortochka.app.camera.CameraStatus
 import com.fortochka.app.viewer.ViewerStatus
 import com.fortochka.app.viewer.WallpaperWorker
+import com.fortochka.app.viewer.describeCamera
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uniffi.fortochka_mobile.DeviceConfig
@@ -49,6 +51,7 @@ import uniffi.fortochka_mobile.checkServer
 import uniffi.fortochka_mobile.coreVersion
 import uniffi.fortochka_mobile.pairWithCode
 import uniffi.fortochka_mobile.registerCamera
+import uniffi.fortochka_mobile.viewStatus
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -82,6 +85,7 @@ fun AppRoot() {
     val reset: () -> Unit = {
         CameraService.stop(context)
         WallpaperWorker.cancel(context)
+        ViewerStatus.clear(context)
         scope.launch { save(ConfigStore.EMPTY) }
     }
 
@@ -258,8 +262,23 @@ fun CameraScreen(config: DeviceConfig, onReset: () -> Unit) {
 fun ViewerScreen(config: DeviceConfig, onReset: () -> Unit) {
     val context = LocalContext.current
     val status by ViewerStatus.text.collectAsState()
+    var health by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) { ViewerStatus.restore(context) }
+    // жива ли камера — раз в минуту, пока экран открыт
+    LaunchedEffect(Unit) {
+        val baseUrl = config.serverUrl ?: return@LaunchedEffect
+        val viewToken = config.viewToken ?: return@LaunchedEffect
+        while (true) {
+            health = try {
+                val camera = onIo { viewStatus(baseUrl, viewToken) }
+                describeCamera(camera.lastFrameAt, System.currentTimeMillis() / 1000)
+            } catch (e: Exception) {
+                "Не удалось узнать, что с камерой: ${e.message}"
+            }
+            delay(60_000)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -272,7 +291,8 @@ fun ViewerScreen(config: DeviceConfig, onReset: () -> Unit) {
             "Окно в «${config.cameraName ?: "камеру"}»: обои обновляются раз в 15 минут.",
             style = MaterialTheme.typography.bodyMedium,
         )
-        Text(status, style = MaterialTheme.typography.bodyLarge)
+        if (health.isNotEmpty()) Text(health, style = MaterialTheme.typography.bodyLarge)
+        Text(status, style = MaterialTheme.typography.bodyMedium)
 
         Button(onClick = { WallpaperWorker.refreshNow(context) }) {
             Text("Обновить обои сейчас")

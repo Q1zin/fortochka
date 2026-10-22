@@ -63,6 +63,13 @@ pub struct PairedCamera {
     pub camera_name: String,
 }
 
+#[derive(uniffi::Record)]
+pub struct ViewStatus {
+    pub camera_name: String,
+    /// Unix-время последнего кадра; `None` — кадров ещё не было.
+    pub last_frame_at: Option<i64>,
+}
+
 #[derive(uniffi::Enum)]
 pub enum DeviceRole {
     Camera,
@@ -173,6 +180,16 @@ pub fn upload_frame(
 ) -> Result<(), MobileError> {
     ApiClient::new(&base_url)?.upload_frame(&camera_id, &upload_token, &jpeg)?;
     Ok(())
+}
+
+/// Жива ли камера и есть ли новый кадр — без скачивания самого кадра.
+#[uniffi::export]
+pub fn view_status(base_url: String, view_token: String) -> Result<ViewStatus, MobileError> {
+    let status = ApiClient::new(&base_url)?.view_status(&view_token)?;
+    Ok(ViewStatus {
+        camera_name: status.camera_name,
+        last_frame_at: status.last_frame_at,
+    })
 }
 
 /// Свежий кадр, кропнутый сервером под экран зрителя.

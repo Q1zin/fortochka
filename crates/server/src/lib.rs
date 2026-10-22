@@ -30,6 +30,7 @@ pub fn app(state: AppState) -> Router {
         )
         .route(routes::PAIR, post(handlers::pair))
         .route("/cam/{view_token}/wallpaper.jpg", get(handlers::wallpaper))
+        .route("/api/v1/view/{view_token}", get(handlers::view_status))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

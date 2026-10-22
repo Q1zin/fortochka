@@ -48,6 +48,9 @@ PAIR=$(curl -fsS -X POST "$BASE/api/v1/pair" \
 VIEW=$(jsonget "$PAIR" view_token)
 echo "→ пейринг прошёл: камера «$(jsonget "$PAIR" camera_name)»"
 
+STATUS=$(curl -fsS "$BASE/api/v1/view/$VIEW")
+echo "→ статус: последний кадр в $(jsonget "$STATUS" last_frame_at) (unix)"
+
 curl -fsS "$BASE/cam/$VIEW/wallpaper.jpg?w=108&h=240" -o "$TMP/wall.jpg"
 file "$TMP/wall.jpg" | grep -q JPEG || { echo "✗ обои — не JPEG"; exit 1; }
 echo "→ обои получены: $(file -b "$TMP/wall.jpg" | cut -d, -f1,8)"

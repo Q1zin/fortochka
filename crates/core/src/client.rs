@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use fortochka_proto::{
     ApiErrorBody, FrameUploadResponse, PairRequest, PairResponse, RegisterCameraRequest,
-    RegisterCameraResponse, routes,
+    RegisterCameraResponse, ViewStatus, routes,
 };
 use reqwest::blocking::{Client, Response};
 use url::Url;
@@ -87,6 +87,15 @@ impl ApiClient {
         };
         self.with_retry(|| {
             let resp = self.http.post(url.clone()).json(&body).send()?;
+            Ok(Self::expect_success(resp)?.json()?)
+        })
+    }
+
+    /// Имя камеры и время последнего кадра — без скачивания самого кадра.
+    pub fn view_status(&self, view_token: &str) -> Result<ViewStatus, CoreError> {
+        let url = self.url(&routes::view_status(view_token))?;
+        self.with_retry(|| {
+            let resp = self.http.get(url.clone()).send()?;
             Ok(Self::expect_success(resp)?.json()?)
         })
     }

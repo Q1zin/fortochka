@@ -24,6 +24,12 @@ pub mod routes {
     pub fn wallpaper(view_token: &str) -> String {
         format!("/cam/{view_token}/wallpaper.jpg")
     }
+
+    /// Статус для зрителя: что за камера и когда она прислала кадр.
+    #[must_use]
+    pub fn view_status(view_token: &str) -> String {
+        format!("/api/v1/view/{view_token}")
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,6 +63,15 @@ pub struct PairResponse {
 pub struct FrameUploadResponse {
     /// Unix-время (секунды), когда сервер принял кадр.
     pub received_at: i64,
+}
+
+/// Что зритель знает о камере, не скачивая сам кадр.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ViewStatus {
+    pub camera_name: String,
+    /// Unix-время последнего кадра — по нему видно, жива ли камера
+    /// и есть ли смысл качать обои заново. `None` — кадров ещё не было.
+    pub last_frame_at: Option<i64>,
 }
 
 /// Тело ошибки, которое сервер отдаёт вместе с не-2xx статусом.

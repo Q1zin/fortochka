@@ -94,6 +94,27 @@ fn full_cycle_register_upload_pair_view() {
 }
 
 #[test]
+fn view_status_reports_last_frame_time() {
+    let server = spawn_server();
+    let api = client(&server);
+    let camera = api.register_camera("Статус").expect("register");
+    let paired = api.pair(&camera.pairing_code).expect("pair");
+
+    let before = api.view_status(&paired.view_token).expect("статус");
+    assert_eq!(before.camera_name, "Статус");
+    assert_eq!(before.last_frame_at, None);
+
+    let sent = api
+        .upload_frame(&camera.camera_id, &camera.upload_token, &test_jpeg(40, 80))
+        .expect("upload");
+    let after = api.view_status(&paired.view_token).expect("статус");
+    assert_eq!(after.last_frame_at, Some(sent.received_at));
+
+    let err = api.view_status("чужой-токен").unwrap_err();
+    assert!(matches!(err, CoreError::Api { status: 404, .. }), "{err:?}");
+}
+
+#[test]
 fn pairing_code_is_case_insensitive() {
     let server = spawn_server();
     let api = client(&server);

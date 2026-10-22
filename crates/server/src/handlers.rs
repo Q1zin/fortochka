@@ -7,6 +7,7 @@ use axum::http::{HeaderMap, header};
 use axum::response::{IntoResponse, Response};
 use fortochka_proto::{
     FrameUploadResponse, PairRequest, PairResponse, RegisterCameraRequest, RegisterCameraResponse,
+    ViewStatus,
 };
 use rand::Rng;
 use serde::Deserialize;
@@ -111,9 +112,34 @@ pub async fn upload_frame(
     }
 
     storage::store_frame(&state.data_dir, &camera_id, &body).await?;
+    let received_at = unix_now();
+    sqlx::query("UPDATE cameras SET last_frame_at = ? WHERE id = ?")
+        .bind(received_at)
+        .bind(&camera_id)
+        .execute(&state.db)
+        .await?;
     tracing::debug!(camera_id, bytes = body.len(), "принят кадр");
-    Ok(Json(FrameUploadResponse {
-        received_at: unix_now(),
+    Ok(Json(FrameUploadResponse { received_at }))
+}
+
+/// Зритель спрашивает, жива ли камера и есть ли новый кадр, —
+/// без скачивания самого кадра.
+pub async fn view_status(
+    State(state): State<AppState>,
+    Path(view_token): Path<String>,
+) -> Result<Json<ViewStatus>, ApiError> {
+    let row = sqlx::query(
+        "SELECT c.name, c.last_frame_at FROM view_tokens v \
+         JOIN cameras c ON c.id = v.camera_id WHERE v.token = ?",
+    )
+    .bind(&view_token)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| ApiError::not_found("invalid_view_token", "токен не найден"))?;
+
+    Ok(Json(ViewStatus {
+        camera_name: row.get("name"),
+        last_frame_at: row.get("last_frame_at"),
     }))
 }
 

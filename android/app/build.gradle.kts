@@ -49,4 +49,6 @@ dependencies {
     implementation(libs.androidx.work.runtime)
     // JNA нужен сгенерированным UniFFI-биндингам (мост Kotlin → libfortochka_mobile.so)
     implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
+
+    testImplementation(libs.junit)
 }
