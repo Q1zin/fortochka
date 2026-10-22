@@ -22,6 +22,9 @@ cat ~/.ssh/fortochka_deploy   # содержимое → секрет SSH_PRIVAT
 
 ## 2. Разовая настройка сервера
 
+Хватает 1 vCPU и 1 ГБ памяти: образ собирается в CI, на сервере — только
+`docker compose pull`.
+
 ```bash
 # Docker, если ещё нет
 curl -fsSL https://get.docker.com | sh
@@ -37,7 +40,10 @@ echo "FORTOCHKA_DOMAIN=fortochka.fun" > /opt/fortochka/.env
 ## 3. DNS и порты
 
 - A-запись `fortochka.fun` → IP сервера;
-- открыты порты 80 и 443 (Caddy сам получит сертификат Let's Encrypt).
+- открыты порты 80 и 443 (Caddy сам получит сертификат Let's Encrypt);
+- в первые 15 дней после регистрации домена подтвердите email владельца
+  по письму регистратора — иначе домен уходит в verification hold
+  (NS → `*.verification-hold.suspended-domain.com`) и пропадает из DNS.
 
 ## 4. Проверка
 
