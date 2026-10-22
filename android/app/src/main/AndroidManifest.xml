@@ -51,6 +51,19 @@
                 android:resource="@xml/wallpaper" />
         </service>
 
+        <service
+            android:name=".viewer.VideoWallpaperService"
+            android:exported="true"
+            android:label="Форточка — видео"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper_video" />
+        </service>
+
         <!-- BOOT_COMPLETED и MY_PACKAGE_REPLACED — системные броадкасты, шлёт только ОС -->
         <receiver
             android:name=".camera.BootReceiver"

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="wallpaper_description">Окно в камеру: кадр меняется сам, пока вы смотрите на экран</string>
+    <string name="wallpaper_video_description">Окно в камеру: свежий ролик с камеры крутится по кругу</string>
 </resources>

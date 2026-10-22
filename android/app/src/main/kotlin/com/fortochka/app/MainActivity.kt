@@ -45,6 +45,7 @@ import com.fortochka.app.camera.CameraService
 import com.fortochka.app.camera.CameraStatus
 import com.fortochka.app.viewer.ViewerStatus
 import com.fortochka.app.viewer.LiveWallpaperService
+import com.fortochka.app.viewer.VideoWallpaperService
 import com.fortochka.app.viewer.WallpaperWorker
 import com.fortochka.app.viewer.describeCamera
 import kotlinx.coroutines.Dispatchers
@@ -298,9 +299,12 @@ fun CameraScreen(config: DeviceConfig, onReset: () -> Unit, onChange: (DeviceCon
 fun ViewerScreen(config: DeviceConfig, onReset: () -> Unit) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val scope = rememberCoroutineScope()
     val status by ViewerStatus.text.collectAsState()
     var health by remember { mutableStateOf("") }
     var live by remember { mutableStateOf(false) }
+    var hasClips by remember { mutableStateOf(false) }
+    var loadingClip by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { ViewerStatus.restore(context) }
     // живые обои ставят в системном окне — вернулись оттуда, смотрим, что вышло
@@ -318,6 +322,7 @@ fun ViewerScreen(config: DeviceConfig, onReset: () -> Unit) {
             while (true) {
                 health = try {
                     val camera = onIo { viewStatus(baseUrl, viewToken) }
+                    hasClips = camera.lastClipAt != null
                     describeCamera(camera.lastFrameAt, System.currentTimeMillis() / 1000)
                 } catch (e: Exception) {
                     "Не удалось узнать, что с камерой: ${e.message}"
@@ -343,17 +348,32 @@ fun ViewerScreen(config: DeviceConfig, onReset: () -> Unit) {
 
         if (live) {
             Text(
-                "Стоят живые обои: кадр сам меняется, пока вы смотрите на экран.",
+                "Стоят живые обои: они обновляются сами, пока вы смотрите на экран.",
                 style = MaterialTheme.typography.bodyMedium,
             )
         } else {
             Text(status, style = MaterialTheme.typography.bodyMedium)
-            Button(onClick = { context.startActivity(LiveWallpaperService.pickerIntent(context)) }) {
-                Text("Сделать живыми обоями")
-            }
             OutlinedButton(onClick = { WallpaperWorker.refreshNow(context) }) {
                 Text("Обновить обои сейчас")
             }
+        }
+        Button(onClick = { context.startActivity(LiveWallpaperService.pickerIntent(context)) }) {
+            Text("Живые обои: кадры")
+        }
+        // видео — если камера его снимает
+        if (hasClips) {
+            Button(
+                enabled = !loadingClip,
+                onClick = {
+                    scope.launch {
+                        // сначала ролик на диск — иначе предпросмотр покажет чёрный экран
+                        loadingClip = true
+                        onIo { VideoWallpaperService.downloadIfNew(context, onlyUnmetered = false) }
+                        loadingClip = false
+                        context.startActivity(VideoWallpaperService.pickerIntent(context))
+                    }
+                },
+            ) { Text(if (loadingClip) "Качаем ролик…" else "Живые обои: видео") }
         }
         HibernationWarning()
         OutlinedButton(onClick = onReset) { Text("Сбросить настройки") }

@@ -189,10 +189,9 @@ class LiveWallpaperService : WallpaperService() {
         private const val FADE_MS = 800f
         private const val FRAME_MS = 16L
 
-        /** Наши живые обои стоят на рабочем столе. */
+        /** На рабочем столе наши живые обои — кадры или видео. */
         fun isActive(context: Context): Boolean =
-            WallpaperManager.getInstance(context).wallpaperInfo?.serviceName ==
-                LiveWallpaperService::class.java.name
+            WallpaperManager.getInstance(context).wallpaperInfo?.packageName == context.packageName
 
         /** Системный экран предпросмотра — поставить обои может только человек. */
         fun pickerIntent(context: Context): Intent =
