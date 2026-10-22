@@ -66,6 +66,13 @@ fn test_jpeg(w: u32, h: u32) -> Vec<u8> {
     buf
 }
 
+/// Сервер проверяет только бокс ftyp в начале — настоящий ролик тестам не нужен.
+fn fake_mp4() -> Vec<u8> {
+    let mut mp4 = b"\0\0\0\x18ftypisom\0\0\x02\0isomiso2".to_vec();
+    mp4.extend_from_slice(&[7; 1000]);
+    mp4
+}
+
 #[test]
 fn full_cycle_register_upload_pair_view() {
     let server = spawn_server();
@@ -115,6 +122,45 @@ fn view_status_reports_last_frame_time() {
 }
 
 #[test]
+fn clip_round_trip() {
+    let server = spawn_server();
+    let api = client(&server);
+    let camera = api.register_camera("Видео").expect("register");
+    let paired = api.pair(&camera.pairing_code).expect("pair");
+    let status = api.view_status(&paired.view_token).expect("статус");
+    assert_eq!(status.last_clip_at, None);
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let src = dir.path().join("clip.mp4");
+    std::fs::write(&src, fake_mp4()).expect("write");
+    let sent = api
+        .upload_clip(&camera.camera_id, &camera.upload_token, &src)
+        .expect("upload clip");
+    let status = api.view_status(&paired.view_token).expect("статус");
+    assert_eq!(status.last_clip_at, Some(sent.received_at));
+
+    let dest = dir.path().join("got.mp4");
+    api.fetch_clip(&paired.view_token, &dest)
+        .expect("fetch clip");
+    assert_eq!(std::fs::read(&dest).expect("read"), fake_mp4());
+}
+
+#[test]
+fn garbage_clip_is_rejected() {
+    let server = spawn_server();
+    let api = client(&server);
+    let camera = api.register_camera("Мусор").expect("register");
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let src = dir.path().join("clip.mp4");
+    std::fs::write(&src, b"definitely not a video").expect("write");
+    let err = api
+        .upload_clip(&camera.camera_id, &camera.upload_token, &src)
+        .unwrap_err();
+    assert!(matches!(err, CoreError::Api { status: 400, .. }), "{err:?}");
+}
+
+#[test]
 fn deleted_camera_disappears_for_viewers() {
     let server = spawn_server();
     let api = client(&server);
@@ -123,10 +169,20 @@ fn deleted_camera_disappears_for_viewers() {
         .expect("upload");
     let paired = api.pair(&camera.pairing_code).expect("pair");
 
+    let dir = tempfile::tempdir().expect("tempdir");
+    let clip = dir.path().join("clip.mp4");
+    std::fs::write(&clip, fake_mp4()).expect("write");
+    api.upload_clip(&camera.camera_id, &camera.upload_token, &clip)
+        .expect("upload clip");
+
     api.delete_camera(&camera.camera_id, &camera.upload_token)
         .expect("delete");
 
     let err = api.fetch_wallpaper(&paired.view_token, 10, 20).unwrap_err();
+    assert!(matches!(err, CoreError::Api { status: 404, .. }), "{err:?}");
+    let err = api
+        .fetch_clip(&paired.view_token, &dir.path().join("got.mp4"))
+        .unwrap_err();
     assert!(matches!(err, CoreError::Api { status: 404, .. }), "{err:?}");
     let err = api.pair(&camera.pairing_code).unwrap_err();
     assert!(matches!(err, CoreError::Api { status: 404, .. }), "{err:?}");

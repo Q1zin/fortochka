@@ -52,6 +52,15 @@ echo "→ пейринг прошёл: камера «$(jsonget "$PAIR" camera_n
 STATUS=$(curl -fsS "$BASE/api/v1/view/$VIEW")
 echo "→ статус: последний кадр в $(jsonget "$STATUS" last_frame_at) (unix)"
 
+# клип: сервер смотрит только на бокс ftyp, поэтому хватит заголовка MP4
+printf '\0\0\0\030ftypisom\0\0\002\0isomiso2' > "$TMP/clip.mp4"
+curl -fsS -X POST "$BASE/api/v1/cameras/$CAM/clip" \
+    -H "authorization: Bearer $TOK" -H 'content-type: video/mp4' \
+    --data-binary @"$TMP/clip.mp4" > /dev/null
+curl -fsS "$BASE/cam/$VIEW/clip.mp4" -o "$TMP/got.mp4"
+cmp -s "$TMP/clip.mp4" "$TMP/got.mp4" || { echo "✗ клип вернулся не тем"; exit 1; }
+echo "→ клип загружен и скачан"
+
 curl -fsS "$BASE/cam/$VIEW/wallpaper.jpg?w=108&h=240" -o "$TMP/wall.jpg"
 file "$TMP/wall.jpg" | grep -q JPEG || { echo "✗ обои — не JPEG"; exit 1; }
 echo "→ обои получены: $(file -b "$TMP/wall.jpg" | cut -d, -f1,8)"

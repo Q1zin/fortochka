@@ -1,3 +1,5 @@
+use std::fs::{self, File};
+use std::path::Path;
 use std::time::Duration;
 
 use fortochka_proto::{
@@ -9,6 +11,9 @@ use url::Url;
 
 use crate::error::CoreError;
 use crate::retry::{Backoff, retry};
+
+/// Клип в несколько мегабайт по слабому каналу в общую минуту не уложится.
+const CLIP_TIMEOUT: Duration = Duration::from_mins(5);
 
 /// Синхронный клиент API сервера.
 pub struct ApiClient {
@@ -77,6 +82,41 @@ impl ApiClient {
                 .body(jpeg.to_vec())
                 .send()?;
             Ok(Self::expect_success(resp)?.json()?)
+        })
+    }
+
+    /// Видеоклип прямо из файла: в память целиком его не тянем. Как и кадр,
+    /// идемпотентен — на повторе файл просто открывается заново.
+    pub fn upload_clip(
+        &self,
+        camera_id: &str,
+        upload_token: &str,
+        path: &Path,
+    ) -> Result<FrameUploadResponse, CoreError> {
+        let url = self.url(&routes::camera_clip(camera_id))?;
+        self.with_retry(|| {
+            let resp = self
+                .http
+                .post(url.clone())
+                .bearer_auth(upload_token)
+                .header(reqwest::header::CONTENT_TYPE, "video/mp4")
+                .timeout(CLIP_TIMEOUT)
+                .body(File::open(path)?)
+                .send()?;
+            Ok(Self::expect_success(resp)?.json()?)
+        })
+    }
+
+    /// Последний клип камеры — сразу в файл `dest`. Через временный файл:
+    /// плеер, который крутит прошлый клип, не увидит недокачанный.
+    pub fn fetch_clip(&self, view_token: &str, dest: &Path) -> Result<(), CoreError> {
+        let url = self.url(&routes::clip(view_token))?;
+        let tmp = dest.with_extension("tmp");
+        self.with_retry(|| {
+            let resp = self.http.get(url.clone()).timeout(CLIP_TIMEOUT).send()?;
+            Self::expect_success(resp)?.copy_to(&mut File::create(&tmp)?)?;
+            fs::rename(&tmp, dest)?;
+            Ok(())
         })
     }
 

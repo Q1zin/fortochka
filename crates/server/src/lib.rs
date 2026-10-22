@@ -22,6 +22,8 @@ pub use state::{AppState, ServerConfig};
 
 /// Максимальный размер кадра: 12-Мп JPEG обычно 3–6 МБ, берём с запасом.
 const MAX_FRAME_BYTES: usize = 20 * 1024 * 1024;
+/// Клип — 20 с при ~1,5 Мбит/с, около 4 МБ; запас на кодеки, что игнорируют битрейт.
+const MAX_CLIP_BYTES: usize = 48 * 1024 * 1024;
 
 /// Роутер приложения. Вызывать внутри tokio-рантайма (см. [`limits::per_ip`])
 /// и обслуживать с `into_make_service_with_connect_info::<SocketAddr>()`.
@@ -37,6 +39,10 @@ pub fn app(state: AppState) -> Router {
             post(handlers::upload_frame).layer(DefaultBodyLimit::max(MAX_FRAME_BYTES)),
         )
         .route(
+            "/api/v1/cameras/{camera_id}/clip",
+            post(handlers::upload_clip).layer(DefaultBodyLimit::max(MAX_CLIP_BYTES)),
+        )
+        .route(
             "/api/v1/cameras/{camera_id}",
             delete(handlers::delete_camera),
         )
@@ -45,6 +51,7 @@ pub fn app(state: AppState) -> Router {
             post(handlers::pair).layer(limits::per_ip(10, Duration::from_secs(6))),
         )
         .route("/cam/{view_token}/wallpaper.jpg", get(handlers::wallpaper))
+        .route("/cam/{view_token}/clip.mp4", get(handlers::clip))
         .route("/api/v1/view/{view_token}", get(handlers::view_status))
         .layer(TraceLayer::new_for_http())
         .with_state(state)

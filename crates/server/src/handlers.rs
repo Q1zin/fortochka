@@ -16,6 +16,7 @@ use uuid::Uuid;
 
 use crate::error::ApiError;
 use crate::state::AppState;
+use crate::storage::Media;
 use crate::{images, storage};
 
 /// Пейринг-код без похожих символов (0/O, 1/I) — его вводят руками.
@@ -97,7 +98,7 @@ pub async fn upload_frame(
         ));
     }
 
-    storage::store_frame(&state.data_dir, &camera_id, &body).await?;
+    storage::store(&state.data_dir, &camera_id, Media::Frame, &body).await?;
     let received_at = unix_now();
     sqlx::query("UPDATE cameras SET last_frame_at = ? WHERE id = ?")
         .bind(received_at)
@@ -108,7 +109,35 @@ pub async fn upload_frame(
     Ok(Json(FrameUploadResponse { received_at }))
 }
 
-/// Камера уходит насовсем — вместе с кадром и зрителями. Это делает сброс
+/// Видеоклип для живых обоев. Как и кадр, хранится только последний.
+pub async fn upload_clip(
+    State(state): State<AppState>,
+    Path(camera_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<FrameUploadResponse>, ApiError> {
+    authorize_camera(&state, &camera_id, &headers).await?;
+
+    // MP4 начинается с бокса ftyp; разбирать ролик целиком — дело плеера.
+    if body.get(4..8) != Some(b"ftyp".as_slice()) {
+        return Err(ApiError::bad_request(
+            "not_an_mp4",
+            "тело запроса не похоже на MP4",
+        ));
+    }
+
+    storage::store(&state.data_dir, &camera_id, Media::Clip, &body).await?;
+    let received_at = unix_now();
+    sqlx::query("UPDATE cameras SET last_clip_at = ? WHERE id = ?")
+        .bind(received_at)
+        .bind(&camera_id)
+        .execute(&state.db)
+        .await?;
+    tracing::debug!(camera_id, bytes = body.len(), "принят клип");
+    Ok(Json(FrameUploadResponse { received_at }))
+}
+
+/// Камера уходит насовсем — вместе с кадром, клипом и зрителями. Это делает сброс
 /// настроек на телефоне-камере: иначе последний кадр висел бы на сервере вечно.
 pub async fn delete_camera(
     State(state): State<AppState>,
@@ -127,7 +156,7 @@ pub async fn delete_camera(
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
-    storage::delete_frame(&state.data_dir, &camera_id).await?;
+    storage::delete_all(&state.data_dir, &camera_id).await?;
 
     tracing::info!(camera_id, "камера удалена");
     Ok(StatusCode::NO_CONTENT)
@@ -140,7 +169,7 @@ pub async fn view_status(
     Path(view_token): Path<String>,
 ) -> Result<Json<ViewStatus>, ApiError> {
     let row = sqlx::query(
-        "SELECT c.name, c.last_frame_at FROM view_tokens v \
+        "SELECT c.name, c.last_frame_at, c.last_clip_at FROM view_tokens v \
          JOIN cameras c ON c.id = v.camera_id WHERE v.token = ?",
     )
     .bind(&view_token)
@@ -151,6 +180,7 @@ pub async fn view_status(
     Ok(Json(ViewStatus {
         camera_name: row.get("name"),
         last_frame_at: row.get("last_frame_at"),
+        last_clip_at: row.get("last_clip_at"),
     }))
 }
 
@@ -197,14 +227,8 @@ pub async fn wallpaper(
     Path(view_token): Path<String>,
     Query(params): Query<WallpaperParams>,
 ) -> Result<Response, ApiError> {
-    let row = sqlx::query("SELECT camera_id FROM view_tokens WHERE token = ?")
-        .bind(&view_token)
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| ApiError::not_found("invalid_view_token", "токен не найден"))?;
-    let camera_id: String = row.get("camera_id");
-
-    let jpeg = storage::load_frame(&state.data_dir, &camera_id)
+    let camera_id = camera_for_view(&state, &view_token).await?;
+    let jpeg = storage::load(&state.data_dir, &camera_id, Media::Frame)
         .await?
         .ok_or_else(|| {
             ApiError::not_found("no_frame_yet", "камера ещё не прислала ни одного кадра")
@@ -249,6 +273,34 @@ pub async fn wallpaper(
         jpeg,
     )
         .into_response())
+}
+
+/// Последний клип камеры целиком: видео-обои качают его и крутят по кругу.
+pub async fn clip(
+    State(state): State<AppState>,
+    Path(view_token): Path<String>,
+) -> Result<Response, ApiError> {
+    let camera_id = camera_for_view(&state, &view_token).await?;
+    let mp4 = storage::load(&state.data_dir, &camera_id, Media::Clip)
+        .await?
+        .ok_or_else(|| ApiError::not_found("no_clip_yet", "камера ещё не прислала видео"))?;
+    Ok((
+        [
+            (header::CONTENT_TYPE, "video/mp4"),
+            (header::CACHE_CONTROL, "no-store"),
+        ],
+        mp4,
+    )
+        .into_response())
+}
+
+async fn camera_for_view(state: &AppState, view_token: &str) -> Result<String, ApiError> {
+    let row = sqlx::query("SELECT camera_id FROM view_tokens WHERE token = ?")
+        .bind(view_token)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| ApiError::not_found("invalid_view_token", "токен не найден"))?;
+    Ok(row.get("camera_id"))
 }
 
 /// Запрос подписан upload-токеном именно этой камеры.

@@ -24,11 +24,23 @@ pub mod routes {
         format!("/api/v1/cameras/{camera_id}/frame")
     }
 
+    /// Приём видеоклипа от камеры.
+    #[must_use]
+    pub fn camera_clip(camera_id: &str) -> String {
+        format!("/api/v1/cameras/{camera_id}/clip")
+    }
+
     /// Выдача обоев зрителю. Токен в пути, а не в заголовке,
     /// потому что iOS Shortcuts умеет только простой GET по URL.
     #[must_use]
     pub fn wallpaper(view_token: &str) -> String {
         format!("/cam/{view_token}/wallpaper.jpg")
+    }
+
+    /// Последний видеоклип камеры для видео-обоев.
+    #[must_use]
+    pub fn clip(view_token: &str) -> String {
+        format!("/cam/{view_token}/clip.mp4")
     }
 
     /// Статус для зрителя: что за камера и когда она прислала кадр.
@@ -78,6 +90,10 @@ pub struct ViewStatus {
     /// Unix-время последнего кадра — по нему видно, жива ли камера
     /// и есть ли смысл качать обои заново. `None` — кадров ещё не было.
     pub last_frame_at: Option<i64>,
+    /// Unix-время последнего видеоклипа; `None` — камера видео не снимает.
+    /// `default` — чтобы клиент понимал и сервер, который поля ещё не шлёт.
+    #[serde(default)]
+    pub last_clip_at: Option<i64>,
 }
 
 /// Тело ошибки, которое сервер отдаёт вместе с не-2xx статусом.

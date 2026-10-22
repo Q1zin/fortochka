@@ -68,6 +68,8 @@ pub struct ViewStatus {
     pub camera_name: String,
     /// Unix-время последнего кадра; `None` — кадров ещё не было.
     pub last_frame_at: Option<i64>,
+    /// Unix-время последнего видеоклипа; `None` — камера видео не снимает.
+    pub last_clip_at: Option<i64>,
 }
 
 #[derive(uniffi::Enum)]
@@ -199,7 +201,26 @@ pub fn view_status(base_url: String, view_token: String) -> Result<ViewStatus, M
     Ok(ViewStatus {
         camera_name: status.camera_name,
         last_frame_at: status.last_frame_at,
+        last_clip_at: status.last_clip_at,
     })
+}
+
+/// Видеоклип камеры из файла `path` — Kotlin отдаёт путь, а не мегабайты байтов.
+#[uniffi::export]
+pub fn upload_clip(
+    base_url: String,
+    camera_id: String,
+    upload_token: String,
+    path: String,
+) -> Result<(), MobileError> {
+    ApiClient::new(&base_url)?.upload_clip(&camera_id, &upload_token, Path::new(&path))?;
+    Ok(())
+}
+
+/// Последний клип камеры — в файл `dest` (атомарно, через временный файл).
+#[uniffi::export]
+pub fn fetch_clip(base_url: String, view_token: String, dest: String) -> Result<(), MobileError> {
+    Ok(ApiClient::new(&base_url)?.fetch_clip(&view_token, Path::new(&dest))?)
 }
 
 /// Свежий кадр, кропнутый сервером под экран зрителя.
