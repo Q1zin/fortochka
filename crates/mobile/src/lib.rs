@@ -88,6 +88,9 @@ pub struct DeviceConfig {
     pub upload_token: Option<String>,
     pub pairing_code: Option<String>,
     pub capture_interval_secs: Option<u32>,
+    // default — чтобы Kotlin-код, собирающий конфиг, не трогать ради нового поля
+    #[uniffi(default = None)]
+    pub record_clips: Option<bool>,
     pub view_token: Option<String>,
     pub camera_name: Option<String>,
 }
@@ -104,6 +107,7 @@ impl From<fortochka_core::DeviceConfig> for DeviceConfig {
             upload_token: c.upload_token,
             pairing_code: c.pairing_code,
             capture_interval_secs: c.capture_interval_secs,
+            record_clips: c.record_clips,
             view_token: c.view_token,
             camera_name: c.camera_name,
         }
@@ -122,6 +126,7 @@ impl From<DeviceConfig> for fortochka_core::DeviceConfig {
             upload_token: c.upload_token,
             pairing_code: c.pairing_code,
             capture_interval_secs: c.capture_interval_secs,
+            record_clips: c.record_clips,
             view_token: c.view_token,
             camera_name: c.camera_name,
         }

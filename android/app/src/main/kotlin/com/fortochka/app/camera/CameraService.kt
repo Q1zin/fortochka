@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.PowerManager
+import android.os.SystemClock
 import android.view.OrientationEventListener
 import android.view.Surface
 import androidx.camera.core.CameraSelector
@@ -14,23 +15,33 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.video.FallbackStrategy
+import androidx.camera.video.FileOutputOptions
+import androidx.camera.video.Quality
+import androidx.camera.video.QualitySelector
+import androidx.camera.video.Recorder
+import androidx.camera.video.VideoCapture
+import androidx.camera.video.VideoRecordEvent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.fortochka.app.ConfigStore
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import uniffi.fortochka_mobile.uploadClip
 import uniffi.fortochka_mobile.uploadFrame
 
 /**
@@ -128,11 +139,33 @@ class CameraService : LifecycleService() {
             return
         }
 
+        var lastClipAt = 0L // elapsedRealtime прошлого ролика; 0 — ещё не снимали
         while (true) {
             try {
                 val jpeg = shoot(provider)
                 withContext(Dispatchers.IO) { uploadFrame(baseUrl, cameraId, token, jpeg) }
                 CameraStatus.text.value = "кадр отправлен в ${timeNow()} (${jpeg.size / 1024} КБ)"
+
+                // Видео — реже кадров: ролик весит как десяток снимков. Конфиг читаем
+                // каждый круг, чтобы переключатель на экране работал без перезапуска.
+                val clips = withContext(Dispatchers.IO) {
+                    ConfigStore.load(this@CameraService).recordClips == true
+                }
+                val due = lastClipAt == 0L ||
+                    SystemClock.elapsedRealtime() - lastClipAt >= CLIP_EVERY_MS
+                if (clips && due) {
+                    lastClipAt = SystemClock.elapsedRealtime()
+                    val clip = recordClip(provider)
+                    try {
+                        withContext(Dispatchers.IO) {
+                            uploadClip(baseUrl, cameraId, token, clip.absolutePath)
+                        }
+                        CameraStatus.text.value =
+                            "кадр и видео отправлены в ${timeNow()} (видео ${clip.length() / 1024} КБ)"
+                    } finally {
+                        clip.delete()
+                    }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -181,6 +214,39 @@ class CameraService : LifecycleService() {
         }
     }
 
+    /** Ролик для видео-обоев, как и снимок, — с камерой, открытой только на запись. Звук не пишем. */
+    private suspend fun recordClip(provider: ProcessCameraProvider): File {
+        val recorder = Recorder.Builder()
+            .setQualitySelector(
+                QualitySelector.from(
+                    Quality.HD,
+                    FallbackStrategy.lowerQualityOrHigherThan(Quality.SD),
+                ),
+            )
+            .setTargetVideoEncodingBitRate(CLIP_BITRATE)
+            .build()
+        val capture = VideoCapture.Builder(recorder).setTargetRotation(rotation).build()
+        val file = File(cacheDir, "clip.mp4")
+        provider.unbindAll()
+        provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, capture)
+        try {
+            delay(WARMUP_MS)
+            val finished = CompletableDeferred<VideoRecordEvent.Finalize>()
+            val recording = capture.output
+                .prepareRecording(this, FileOutputOptions.Builder(file).build())
+                .start(ContextCompat.getMainExecutor(this)) { event ->
+                    if (event is VideoRecordEvent.Finalize) finished.complete(event)
+                }
+            delay(CLIP_MS)
+            recording.stop()
+            val result = finished.await()
+            if (result.hasError()) error("видео не записалось, код ${result.error}")
+            return file
+        } finally {
+            provider.unbindAll()
+        }
+    }
+
     /** Снимок в JPEG-байты: ImageCapture без выходного файла отдаёт готовый JPEG в plane 0. */
     private suspend fun takeJpeg(capture: ImageCapture): ByteArray =
         suspendCancellableCoroutine { cont ->
@@ -224,6 +290,10 @@ class CameraService : LifecycleService() {
         private const val NOTIFICATION_ID = 1
         private const val WARMUP_MS = 2_000L
         private const val JPEG_QUALITY = 85
+        private const val CLIP_MS = 20_000L
+        private const val CLIP_EVERY_MS = 10 * 60_000L
+        // 720p при 1,5 Мбит/с — 20 с около 4 МБ; кодеки берут это как подсказку (Samsung — 6 МБ)
+        private const val CLIP_BITRATE = 1_500_000
         const val DEFAULT_INTERVAL_SECS = 180u
 
         @Volatile

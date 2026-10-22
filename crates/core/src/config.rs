@@ -29,6 +29,8 @@ pub struct DeviceConfig {
     pub pairing_code: Option<String>,
     /// Интервал съёмки в секундах; `None` — платформенный дефолт (180).
     pub capture_interval_secs: Option<u32>,
+    /// Снимать ещё и видеоклипы для живых обоев; `None` — нет.
+    pub record_clips: Option<bool>,
     // роль «зритель»
     pub view_token: Option<String>,
     /// Имя подключённой камеры — показываем зрителю в UI.

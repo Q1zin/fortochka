@@ -20,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -29,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -106,7 +108,11 @@ fun AppRoot() {
     }
 
     when (config?.role) {
-        DeviceRole.CAMERA -> CameraScreen(config!!, onReset = reset)
+        DeviceRole.CAMERA -> CameraScreen(
+            config!!,
+            onReset = reset,
+            onChange = { new -> scope.launch { save(new) } },
+        )
         DeviceRole.VIEWER -> ViewerScreen(config!!, onReset = reset)
         else -> SetupScreen(onDone = save)
     }
@@ -235,7 +241,7 @@ fun SetupScreen(onDone: suspend (DeviceConfig) -> Unit) {
 }
 
 @Composable
-fun CameraScreen(config: DeviceConfig, onReset: () -> Unit) {
+fun CameraScreen(config: DeviceConfig, onReset: () -> Unit, onChange: (DeviceConfig) -> Unit) {
     val context = LocalContext.current
     val status by CameraStatus.text.collectAsState()
 
@@ -256,6 +262,20 @@ fun CameraScreen(config: DeviceConfig, onReset: () -> Unit) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(onClick = { CameraService.start(context) }) { Text("Запустить") }
             OutlinedButton(onClick = { CameraService.stop(context) }) { Text("Остановить") }
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Switch(
+                checked = config.recordClips == true,
+                onCheckedChange = { onChange(config.copy(recordClips = it)) },
+            )
+            Text(
+                "Видео для живых обоев: ролик 20 с раз в 10 минут, 4–6 МБ",
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
 
         // вендорские киллеры фоновых процессов — главный враг телефона-камеры
