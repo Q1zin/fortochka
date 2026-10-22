@@ -69,7 +69,11 @@ crates/proto ──── DTO API (serde), общие для всех. Ноль 
 1. **rust** — `fmt --check`, `clippy -D warnings` (с pedantic), `cargo test`.
 2. **android** — cargo-ndk собирает `libfortochka.so`, Gradle — debug-APK (артефакт).
 3. **deploy** (только push в master) — Docker-образ → GHCR →
-   scp compose-файлов → `docker compose pull && up -d` по SSH.
+   scp compose-файлов → `docker compose pull && up -d` по SSH →
+   smoke-тест против прода.
+4. **uptime** (`uptime.yml`, раз в 6 часов) — `healthz` и срок сертификата;
+   упавший прогон приходит письмом. Без коммитов 60 дней GitHub это расписание
+   выключает — включить во вкладке Actions.
 
 Подробности деплоя и разовая настройка сервера — в [DEPLOY.md](DEPLOY.md).
 

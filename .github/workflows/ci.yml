@@ -99,3 +99,8 @@ jobs:
             docker compose pull
             docker compose up -d
             docker image prune -f
+      - name: Прод живой после деплоя
+        run: |
+          # новому контейнеру нужно несколько секунд на старт
+          for i in $(seq 1 30); do curl -fsS https://fortochka.fun/healthz && break; sleep 2; done
+          bash scripts/smoke.sh https://fortochka.fun
