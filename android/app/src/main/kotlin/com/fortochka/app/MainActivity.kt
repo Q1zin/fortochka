@@ -42,6 +42,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.fortochka.app.camera.CameraService
 import com.fortochka.app.camera.CameraStatus
 import com.fortochka.app.viewer.ViewerStatus
+import com.fortochka.app.viewer.LiveWallpaperService
 import com.fortochka.app.viewer.WallpaperWorker
 import com.fortochka.app.viewer.describeCamera
 import kotlinx.coroutines.Dispatchers
@@ -279,8 +280,15 @@ fun ViewerScreen(config: DeviceConfig, onReset: () -> Unit) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val status by ViewerStatus.text.collectAsState()
     var health by remember { mutableStateOf("") }
+    var live by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { ViewerStatus.restore(context) }
+    // живые обои ставят в системном окне — вернулись оттуда, смотрим, что вышло
+    LaunchedEffect(Unit) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            live = LiveWallpaperService.isActive(context)
+        }
+    }
     // Жива ли камера — раз в минуту, пока экран на виду. Сам LaunchedEffect
     // живёт и в свёрнутом приложении, поэтому цикл держим в repeatOnLifecycle.
     LaunchedEffect(Unit) {
@@ -306,15 +314,26 @@ fun ViewerScreen(config: DeviceConfig, onReset: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("Форточка — зритель", style = MaterialTheme.typography.headlineMedium)
+        val window = "Окно в «${config.cameraName ?: "камеру"}»"
         Text(
-            "Окно в «${config.cameraName ?: "камеру"}»: обои обновляются раз в 15 минут.",
+            if (live) "$window." else "$window: обои обновляются раз в 15 минут.",
             style = MaterialTheme.typography.bodyMedium,
         )
         if (health.isNotEmpty()) Text(health, style = MaterialTheme.typography.bodyLarge)
-        Text(status, style = MaterialTheme.typography.bodyMedium)
 
-        Button(onClick = { WallpaperWorker.refreshNow(context) }) {
-            Text("Обновить обои сейчас")
+        if (live) {
+            Text(
+                "Стоят живые обои: кадр сам меняется, пока вы смотрите на экран.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        } else {
+            Text(status, style = MaterialTheme.typography.bodyMedium)
+            Button(onClick = { context.startActivity(LiveWallpaperService.pickerIntent(context)) }) {
+                Text("Сделать живыми обоями")
+            }
+            OutlinedButton(onClick = { WallpaperWorker.refreshNow(context) }) {
+                Text("Обновить обои сейчас")
+            }
         }
         HibernationWarning()
         OutlinedButton(onClick = onReset) { Text("Сбросить настройки") }

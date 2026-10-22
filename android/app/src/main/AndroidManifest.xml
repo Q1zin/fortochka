@@ -37,6 +37,20 @@
             android:exported="false"
             android:foregroundServiceType="camera" />
 
+        <!-- живые обои: ставит их только человек через системный предпросмотр -->
+        <service
+            android:name=".viewer.LiveWallpaperService"
+            android:exported="true"
+            android:label="Форточка"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper" />
+        </service>
+
         <!-- BOOT_COMPLETED и MY_PACKAGE_REPLACED — системные броадкасты, шлёт только ОС -->
         <receiver
             android:name=".camera.BootReceiver"

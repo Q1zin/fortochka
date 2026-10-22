@@ -42,6 +42,12 @@ class WallpaperWorker(context: Context, params: WorkerParameters) :
             return@withContext Result.failure()
         }
 
+        // Живые обои обновляются сами; setBitmap заменил бы их картинкой.
+        if (LiveWallpaperService.isActive(applicationContext)) {
+            ViewerStatus.update(applicationContext, "стоят живые обои — они обновляются сами")
+            return@withContext Result.success()
+        }
+
         try {
             // Сначала дешёвый статус: если на обоях уже этот кадр — не качаем
             // его и не трогаем обои. «Обновить сейчас» ставит force.
